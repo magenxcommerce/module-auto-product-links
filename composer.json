@@ -1,5 +1,5 @@
 {
-    "name": "magenx/module-auto-product-links",
+    "name": "magenxcommerce/module-auto-product-links",
     "description": "Automatically fills Magento's native Related Products, Up-Sells and Cross-Sells from merchant-defined rules. A rule pairs a source condition tree (which products it applies to) with a target condition tree (the candidate pool), both built with the same attribute-picker widget as a Catalog Price Rule, so candidates can be matched on colour, size, price, category, manufacturer or any combination. Targets are chosen either by attribute similarity to the source (same colour, shared category, a price band) or from mined co-purchase history (\"customers who bought this also bought\"), which gives the storefront's Frequently-Bought-Together rail real data. Links are written straight into catalog_product_link, so no storefront or GraphQL change is needed. A ledger table records every link the module authored, so merchant hand-picked links are never overwritten or deleted.",
     "config": {
         "sort-packages": true
