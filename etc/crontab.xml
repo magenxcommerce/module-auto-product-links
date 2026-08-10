@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Magenx. All rights reserved.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
+    <group id="default">
+        <!-- Mines co-purchase pairs from order history. Must run BEFORE the rule
+             job, or a co_purchase rule works from yesterday's aggregate. -->
+        <job name="magenx_auto_link_mine_copurchase"
+             instance="Magenx\AutoProductLinks\Cron\MineCoPurchase" method="execute">
+            <config_path>magenx_auto_product_links/cron/copurchase_schedule</config_path>
+        </job>
+        <!-- Applies the rules and writes catalog_product_link. Schedule it after
+             the co-purchase job and after the catalog reindex. -->
+        <job name="magenx_auto_link_apply_rules"
+             instance="Magenx\AutoProductLinks\Cron\ApplyRules" method="execute">
+            <config_path>magenx_auto_product_links/cron/rules_schedule</config_path>
+        </job>
+    </group>
+</config>

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Magenx. All rights reserved.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <module name="Magenx_AutoProductLinks">
+        <sequence>
+            <!-- catalog_product_link + the link-type constants we write. -->
+            <module name="Magento_Catalog"/>
+            <!-- Magento\Rule\Model\AbstractModel (the two condition trees), the
+                 legacy fieldset renderer, and the SQL condition builder. -->
+            <module name="Magento_Rule"/>
+            <!-- The promo/fieldset.phtml template the rule form renders with. -->
+            <module name="Magento_CatalogRule"/>
+            <!-- Magento\CatalogWidget\Model\Rule\Condition\* — the SQL-pushdown
+                 flavour of the product condition tree (see Model/Rule/ProductMatcher). -->
+            <module name="Magento_CatalogWidget"/>
+            <!-- sales_order / sales_order_item, mined by the co-purchase cron. -->
+            <module name="Magento_Sales"/>
+            <module name="Magento_Store"/>
+            <module name="Magento_Backend"/>
+            <module name="Magento_Ui"/>
+        </sequence>
+    </module>
+</config>

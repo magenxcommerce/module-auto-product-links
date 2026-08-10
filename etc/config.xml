@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Magenx. All rights reserved.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <magenx_auto_product_links>
+            <general>
+                <!-- Off by default: this module writes to a core catalog table. -->
+                <enabled>0</enabled>
+                <!-- On by default: the first run should report, not write. -->
+                <dry_run>1</dry_run>
+                <invalidate_cache>1</invalidate_cache>
+                <max_links_default>8</max_links_default>
+                <!-- Auto links start at 1000 so merchant-picked links (1..N) always
+                     sort first, deterministically and without reading MAX(position). -->
+                <auto_position_base>1000</auto_position_base>
+            </general>
+            <limits>
+                <max_source_products_per_run>5000</max_source_products_per_run>
+                <target_pool_cap>5000</target_pool_cap>
+                <batch_size>100</batch_size>
+            </limits>
+            <copurchase>
+                <lookback_months>6</lookback_months>
+                <min_support>3</min_support>
+                <max_orders_per_run>100000</max_orders_per_run>
+                <max_items_per_order>50</max_items_per_order>
+            </copurchase>
+            <cron>
+                <copurchase_schedule>0 3 * * *</copurchase_schedule>
+                <!-- Must run AFTER the miner. -->
+                <rules_schedule>30 3 * * *</rules_schedule>
+            </cron>
+        </magenx_auto_product_links>
+    </default>
+</config>

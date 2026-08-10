@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Magenx. All rights reserved.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <!-- Sits in Marketing → Promotions beside the Catalog and Cart Price Rules,
+             which it shares its condition-tree widget with.
+
+             The Promotions group is Magento_CatalogRule::promo (CatalogRule
+             declares it, with parent Magento_Backend::marketing). There is no
+             Magento_Backend::marketing_promotion - naming it makes the menu
+             builder throw OutOfRangeException "Specified invalid parent id",
+             which takes out EVERY admin page, not just ours. -->
+        <add id="Magenx_AutoProductLinks::rules"
+             title="Auto Product Link Rules"
+             translate="title"
+             module="Magenx_AutoProductLinks"
+             sortOrder="60"
+             parent="Magento_CatalogRule::promo"
+             action="magenx_autoproductlinks/rule/"
+             resource="Magenx_AutoProductLinks::rules"/>
+    </menu>
+</config>

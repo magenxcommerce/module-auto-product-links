@@ -1,0 +1,71 @@
+{
+    "magenx_auto_link_rule": {
+        "column": {
+            "rule_id": true,
+            "name": true,
+            "description": true,
+            "is_active": true,
+            "from_date": true,
+            "to_date": true,
+            "sort_order": true,
+            "store_id": true,
+            "link_type": true,
+            "target_strategy": true,
+            "conditions_serialized": true,
+            "actions_serialized": true,
+            "match_attributes": true,
+            "price_band_percent": true,
+            "max_links": true,
+            "result_sort": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "MAGENX_AUTO_LINK_RULE_ACTIVE_TYPE_SORT": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "magenx_auto_link_ledger": {
+        "column": {
+            "ledger_id": true,
+            "rule_id": true,
+            "product_id": true,
+            "linked_product_id": true,
+            "link_type_id": true,
+            "position": true,
+            "updated_at": true
+        },
+        "index": {
+            "MAGENX_AUTO_LINK_LEDGER_RULE": true,
+            "MAGENX_AUTO_LINK_LEDGER_LINKED": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "MAGENX_AUTO_LINK_LEDGER_PRODUCT_LINKED_TYPE": true,
+            "MAGENX_AUTO_LINK_LEDGER_PRODUCT_ID_CAT_PRD_ENTT_ENTT_ID": true,
+            "MAGENX_AUTO_LINK_LEDGER_LINKED_PRD_ID_CAT_PRD_ENTT_ENTT_ID": true,
+            "MAGENX_AUTO_LINK_LEDGER_RULE_ID_MAGENX_AUTO_LINK_RULE_RULE_ID": true
+        }
+    },
+    "magenx_auto_link_copurchase": {
+        "column": {
+            "pair_id": true,
+            "store_id": true,
+            "period": true,
+            "product_id": true,
+            "linked_product_id": true,
+            "orders_count": true,
+            "updated_at": true
+        },
+        "index": {
+            "MAGENX_AUTO_LINK_COPURCHASE_STORE_PRODUCT_PERIOD_COUNT": true,
+            "MAGENX_AUTO_LINK_COPURCHASE_PERIOD": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "MAGENX_AUTO_LINK_COPURCHASE_STORE_PERIOD_PRODUCT_LINKED": true
+        }
+    }
+}

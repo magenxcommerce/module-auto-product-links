@@ -1,0 +1,139 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Magenx. All rights reserved.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <tab id="magenx" translate="label" sortOrder="400">
+            <label>Magenx</label>
+        </tab>
+        <section id="magenx_auto_product_links" translate="label" sortOrder="405" showInDefault="1" showInWebsite="1" showInStore="1">
+            <class>separator-top</class>
+            <label>Auto Product Links</label>
+            <tab>magenx</tab>
+            <resource>Magenx_AutoProductLinks::config</resource>
+
+            <group id="general" translate="label" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>General</label>
+                <comment><![CDATA[Fills the native Related Products, Up-Sells and Cross-Sells from the rules under <strong>Marketing &rarr; Auto Product Link Rules</strong>. Links the module writes are recorded in a ledger, so products you linked by hand are never moved, overwritten or deleted. Needs the <code>magenx_auto_link_apply_rules</code> cron running.<br/><strong>Note:</strong> Magento stores product links globally &mdash; <code>catalog_product_link</code> has no store, website or customer-group column &mdash; so a rule's store setting only decides which store's attribute values, prices and orders are read, not who sees the resulting links.]]></comment>
+                <field id="enabled" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Auto Product Links</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>When disabled both cron jobs return immediately and nothing is written. Existing auto links stay in place until a rule is run again.</comment>
+                </field>
+                <field id="dry_run" translate="label" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Dry Run</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Compute every change and write it to var/log/magenx_auto_product_links.log without touching the catalog. Leave this on for the first run.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="invalidate_cache" translate="label" type="select" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Invalidate Product Cache After a Run</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[Broadcasts a <code>cat_p_&lt;id&gt;</code> cache identity for every product whose links changed, which is what lets the headless storefront drop its cached related/up-sell/cross-sell rails immediately instead of waiting for its own TTL. Requires Full Page Cache in Varnish mode and a configured <code>http_cache_hosts</code>; without those nothing is broadcast and new links appear only when the storefront cache expires.]]></comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="max_links_default" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Default Maximum Links per Product</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>Used when a rule leaves its own limit empty. Counts auto links only — links you added by hand are additive and never capped.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="auto_position_base" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Auto Link Position Offset</label>
+                    <validate>validate-digits</validate>
+                    <comment>Auto links are numbered from this position upward, so hand-picked links (normally 1, 2, 3…) always sort ahead of them. Raise it if you position manual links above 1000.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+            </group>
+
+            <group id="limits" translate="label" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Run Limits</label>
+                <comment>Bound how much work one cron run does. A catalog larger than the per-run limit is processed across several nights: each run resumes where the last one stopped.</comment>
+                <field id="max_source_products_per_run" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Maximum Source Products per Run</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>Per rule. The run remembers where it stopped and continues from there next time.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="target_pool_cap" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Maximum Candidate Products per Rule</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>Caps the pool a rule's target conditions may resolve to. A rule whose target conditions match more than this is skipped with a warning in the log — narrow its conditions rather than raising this.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="batch_size" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Products per Batch</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>How many source products are written in one database transaction. Keep it small: catalog_product_link is read on every product page.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+            </group>
+
+            <group id="copurchase" translate="label" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Co-Purchase Mining</label>
+                <comment><![CDATA[Counts how often products were bought in the same order, so a rule using the <strong>Bought together</strong> strategy has real data behind it. Counts are stored per month; only the current month (and briefly the previous one) is recomputed each night.]]></comment>
+                <field id="lookback_months" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Look-back Window (months)</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>How far back pair counts are kept and summed. Older months are pruned.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="min_support" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Minimum Orders per Pair</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>Two products must have been bought together in at least this many orders before they count as a pair. Below about 3 the results are mostly coincidence.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="max_orders_per_run" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Maximum Orders per Run</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>Safety bound on the mining query. If a month holds more orders than this, the run processes what fits and says so in the log.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="max_items_per_order" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Skip Orders With More Lines Than</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>The number of pairs an order produces grows with the square of its line count, so one very large order can dominate the whole aggregate. Orders above this many lines are ignored.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+            </group>
+
+            <group id="cron" translate="label" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Cron</label>
+                <field id="copurchase_schedule" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Co-Purchase Mining Schedule (cron expression)</label>
+                    <comment>Default "0 3 * * *". Must run before the rule job below.</comment>
+                </field>
+                <field id="rules_schedule" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Rule Run Schedule (cron expression)</label>
+                    <comment>Default "30 3 * * *". Schedule it after the co-purchase job and after the catalog reindex, so it works from current prices and a current aggregate.</comment>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>

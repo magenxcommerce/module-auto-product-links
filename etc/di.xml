@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Magenx. All rights reserved.
+ *
+ * The strategy pool is the module's extension point: another module adds a way
+ * of picking link targets by contributing one item to the `strategies` argument,
+ * and it is picked up by the rule form's dropdown and the cron with every guard
+ * (dry run, max_links, the ledger diff) already applied.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <type name="Magenx\AutoProductLinks\Model\Strategy\StrategyPool">
+        <arguments>
+            <argument name="strategies" xsi:type="array">
+                <item name="attribute_match" xsi:type="object">Magenx\AutoProductLinks\Model\Strategy\AttributeMatch</item>
+                <item name="co_purchase" xsi:type="object">Magenx\AutoProductLinks\Model\Strategy\CoPurchase</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!-- Every run lands in var/log/magenx_auto_product_links.log, separate from the
+         general log so an operator can audit what the module wrote to the catalog
+         (and, crucially, how many merchant links it refused to touch). -->
+    <virtualType name="MagenxAutoProductLinksLogHandler" type="Magento\Framework\Logger\Handler\Base">
+        <arguments>
+            <argument name="fileName" xsi:type="string">/var/log/magenx_auto_product_links.log</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="MagenxAutoProductLinksLogger" type="Magento\Framework\Logger\Monolog">
+        <arguments>
+            <argument name="name" xsi:type="string">magenxAutoProductLinks</argument>
+            <argument name="handlers" xsi:type="array">
+                <item name="system" xsi:type="object">MagenxAutoProductLinksLogHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <type name="Magenx\AutoProductLinks\Model\RuleRunner">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagenxAutoProductLinksLogger</argument>
+        </arguments>
+    </type>
+    <type name="Magenx\AutoProductLinks\Model\CoPurchaseMiner">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagenxAutoProductLinksLogger</argument>
+        </arguments>
+    </type>
+    <type name="Magenx\AutoProductLinks\Cron\ApplyRules">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagenxAutoProductLinksLogger</argument>
+        </arguments>
+    </type>
+    <type name="Magenx\AutoProductLinks\Cron\MineCoPurchase">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagenxAutoProductLinksLogger</argument>
+        </arguments>
+    </type>
+
+    <!-- Grid data source. The item key MUST equal the listing's dataSource name
+         (magenx_auto_link_rule_listing_data_source in the ui_component XML), or the
+         grid silently falls back to a plain collection and the joined links_written
+         column disappears. Grid\Collection is a real class, not a SearchResult
+         virtualType, because it joins the ledger count in _initSelect(). -->
+    <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
+        <arguments>
+            <argument name="collections" xsi:type="array">
+                <item name="magenx_auto_link_rule_listing_data_source" xsi:type="string">Magenx\AutoProductLinks\Model\ResourceModel\Rule\Grid\Collection</item>
+            </argument>
+        </arguments>
+    </type>
+</config>

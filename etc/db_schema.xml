@@ -1,0 +1,209 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Magenx. All rights reserved.
+ */
+-->
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+
+    <!-- ===================================================================
+         The rule entity. Two condition trees per rule:
+           conditions_serialized = SOURCE  (which products the rule applies TO)
+           actions_serialized    = TARGET  (the candidate pool it links FROM)
+         Both column names are fixed by Magento\Rule\Model\AbstractModel, which
+         serializes getConditions()/getActions() into exactly these names — they
+         are not free choices.
+         ==================================================================== -->
+    <table name="magenx_auto_link_rule" resource="default" engine="innodb"
+           comment="Rules that auto-populate related / up-sell / cross-sell links">
+        <column xsi:type="int" name="rule_id" unsigned="true" nullable="false" identity="true"
+                comment="Rule ID"/>
+        <column xsi:type="varchar" name="name" length="255" nullable="false"
+                comment="Admin-facing rule name"/>
+        <column xsi:type="text" name="description" nullable="true"
+                comment="Optional admin note"/>
+        <column xsi:type="smallint" name="is_active" unsigned="true" nullable="false" default="0"
+                comment="Whether the rule runs. New rules start off."/>
+        <column xsi:type="date" name="from_date" nullable="true"
+                comment="Rule is inactive before this date"/>
+        <column xsi:type="date" name="to_date" nullable="true"
+                comment="Rule is inactive after this date"/>
+        <column xsi:type="int" name="sort_order" unsigned="true" nullable="false" default="0"
+                comment="Priority: lower runs first and claims link slots first"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" default="0"
+                comment="EVALUATION scope only - which store's attribute values, price index and orders are read. catalog_product_link has no store column, so the links themselves are always global."/>
+        <column xsi:type="varchar" name="link_type" length="16" nullable="false" default="related"
+                comment="related | upsell | crosssell"/>
+        <column xsi:type="varchar" name="target_strategy" length="32" nullable="false" default="attribute_match"
+                comment="attribute_match | co_purchase"/>
+        <column xsi:type="mediumtext" name="conditions_serialized" nullable="true"
+                comment="SOURCE condition tree (JSON). Column name fixed by Magento\Rule\Model\AbstractModel."/>
+        <column xsi:type="mediumtext" name="actions_serialized" nullable="true"
+                comment="TARGET condition tree (JSON). Column name fixed by Magento\Rule\Model\AbstractModel."/>
+        <column xsi:type="text" name="match_attributes" nullable="true"
+                comment="JSON list of attribute codes a candidate must SHARE with the source, plus the pseudo-codes __category and __price_band"/>
+        <column xsi:type="smallint" name="price_band_percent" unsigned="true" nullable="true"
+                comment="Half-width of the price band in percent, used only when __price_band is selected"/>
+        <column xsi:type="smallint" name="max_links" unsigned="true" nullable="false" default="8"
+                comment="Maximum auto links written per source product for this link type"/>
+        <column xsi:type="varchar" name="result_sort" length="32" nullable="false" default="bestsellers"
+                comment="How the surviving candidates are ranked before truncation"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Updated At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="rule_id"/>
+        </constraint>
+
+        <!-- The only hot query on this table is the cron's rule fetch:
+             WHERE is_active = ? AND link_type = ? ORDER BY sort_order ASC.
+             Equality, equality, then the sort column - so the ORDER BY is
+             resolved from the index with no filesort.
+             Deliberately NO index on from_date/to_date: the table has tens of
+             rows and date eligibility is evaluated in PHP (it has to consider
+             the store timezone), so an index there would never be chosen. -->
+        <index referenceId="MAGENX_AUTO_LINK_RULE_ACTIVE_TYPE_SORT" indexType="btree">
+            <column name="is_active"/>
+            <column name="link_type"/>
+            <column name="sort_order"/>
+        </index>
+    </table>
+
+    <!-- ===================================================================
+         The ownership ledger. Every link this module writes gets a row here,
+         and ONLY links with a row here are ever deleted or re-positioned.
+         A merchant's hand-picked link never enters this table, so it can never
+         be released. This table is the whole manual-link guarantee.
+         ==================================================================== -->
+    <table name="magenx_auto_link_ledger" resource="default" engine="innodb"
+           comment="Links authored by Magenx_AutoProductLinks (ownership record for the safe diff)">
+        <column xsi:type="int" name="ledger_id" unsigned="true" nullable="false" identity="true"
+                comment="Ledger ID"/>
+        <column xsi:type="int" name="rule_id" unsigned="true" nullable="false"
+                comment="Rule that last claimed this link"/>
+        <column xsi:type="int" name="product_id" unsigned="true" nullable="false"
+                comment="Source product entity ID"/>
+        <column xsi:type="int" name="linked_product_id" unsigned="true" nullable="false"
+                comment="Linked (target) product entity ID"/>
+        <column xsi:type="smallint" name="link_type_id" unsigned="true" nullable="false"
+                comment="Magento link type id: 1 related, 4 up-sell, 5 cross-sell"/>
+        <column xsi:type="int" name="position" nullable="false" default="0"
+                comment="Position written to catalog_product_link_attribute_int"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Updated At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="ledger_id"/>
+        </constraint>
+
+        <!-- Upsert target, and it mirrors catalog_product_link's own unique key
+             one-for-one so a link can be owned by exactly one rule and a re-run
+             is idempotent.
+             It doubles as the read index for the diff, which is
+             WHERE link_type_id = ? AND product_id IN (<batch of 100>):
+             product_id leads, so the IN set is a range scan and link_type_id
+             filters within it. A separate (link_type_id, product_id) index is
+             deliberately NOT added - it would be redundant and every extra
+             index costs on the delete path. -->
+        <constraint xsi:type="unique" referenceId="MAGENX_AUTO_LINK_LEDGER_PRODUCT_LINKED_TYPE">
+            <column name="product_id"/>
+            <column name="linked_product_id"/>
+            <column name="link_type_id"/>
+        </constraint>
+
+        <!-- "Release everything rule X owns" when a rule is deleted or switched
+             off, and it backs the rule_id foreign key. -->
+        <index referenceId="MAGENX_AUTO_LINK_LEDGER_RULE" indexType="btree">
+            <column name="rule_id"/>
+        </index>
+
+        <!-- Required to back the linked_product_id foreign key: MySQL needs an
+             index whose LEADING column is the FK column, and linked_product_id
+             is not leading in the unique key. -->
+        <index referenceId="MAGENX_AUTO_LINK_LEDGER_LINKED" indexType="btree">
+            <column name="linked_product_id"/>
+        </index>
+
+        <!-- catalog_product_link already cascades on product delete. Without
+             matching cascades here the ledger would keep rows pointing at links
+             that no longer exist, and the module would think it still owns them. -->
+        <constraint xsi:type="foreign" referenceId="MAGENX_AUTO_LINK_LEDGER_PRODUCT_ID_CAT_PRD_ENTT_ENTT_ID"
+                    table="magenx_auto_link_ledger" column="product_id"
+                    referenceTable="catalog_product_entity" referenceColumn="entity_id" onDelete="CASCADE"/>
+        <constraint xsi:type="foreign" referenceId="MAGENX_AUTO_LINK_LEDGER_LINKED_PRD_ID_CAT_PRD_ENTT_ENTT_ID"
+                    table="magenx_auto_link_ledger" column="linked_product_id"
+                    referenceTable="catalog_product_entity" referenceColumn="entity_id" onDelete="CASCADE"/>
+        <!-- NB: this cascade removes the LEDGER row but not the catalog_product_link
+             row, which would leave an orphan indistinguishable from a manual link.
+             Model/ResourceModel/Rule::_beforeDelete() therefore deletes the links
+             FIRST - do not rely on this cascade alone. -->
+        <constraint xsi:type="foreign" referenceId="MAGENX_AUTO_LINK_LEDGER_RULE_ID_MAGENX_AUTO_LINK_RULE_RULE_ID"
+                    table="magenx_auto_link_ledger" column="rule_id"
+                    referenceTable="magenx_auto_link_rule" referenceColumn="rule_id" onDelete="CASCADE"/>
+    </table>
+
+    <!-- ===================================================================
+         Mined co-purchase pairs, bucketed by month exactly like Magento's own
+         sales_bestsellers_aggregated_monthly. Bucketing is what makes the miner
+         incremental AND exactly windowed, and lets a crashed run be re-run
+         safely (the period is DELETEd and rebuilt, never accumulated blindly).
+         ==================================================================== -->
+    <table name="magenx_auto_link_copurchase" resource="default" engine="innodb"
+           comment="Monthly co-purchase pair counts mined from sales_order_item">
+        <column xsi:type="int" name="pair_id" unsigned="true" nullable="false" identity="true"
+                comment="Pair ID"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" default="0"
+                comment="Store the orders were placed in"/>
+        <column xsi:type="date" name="period" nullable="false"
+                comment="First day of the month the pairs were counted in"/>
+        <column xsi:type="int" name="product_id" unsigned="true" nullable="false"
+                comment="Product entity ID"/>
+        <column xsi:type="int" name="linked_product_id" unsigned="true" nullable="false"
+                comment="Product bought alongside product_id"/>
+        <column xsi:type="int" name="orders_count" unsigned="true" nullable="false" default="0"
+                comment="Distinct orders in this period containing both products"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Updated At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="pair_id"/>
+        </constraint>
+
+        <!-- Upsert target for the miner's INSERT ... SELECT ... ON DUPLICATE KEY UPDATE. -->
+        <constraint xsi:type="unique" referenceId="MAGENX_AUTO_LINK_COPURCHASE_STORE_PERIOD_PRODUCT_LINKED">
+            <column name="store_id"/>
+            <column name="period"/>
+            <column name="product_id"/>
+            <column name="linked_product_id"/>
+        </constraint>
+
+        <!-- Read path, one query per source batch:
+             WHERE store_id IN (...) AND product_id IN (...) AND period >= cutoff
+             GROUP BY product_id, linked_product_id ORDER BY SUM(orders_count) DESC.
+             Equality -> IN set -> range -> the aggregated column -> the payload
+             last, so the whole group-and-sum is satisfied from the index alone
+             (Using index) and never touches the row data. Same column-ordering
+             rule as MAGENX_PRICE_HISTORY_SCOPE_PRODUCT_DAY. -->
+        <index referenceId="MAGENX_AUTO_LINK_COPURCHASE_STORE_PRODUCT_PERIOD_COUNT" indexType="btree">
+            <column name="store_id"/>
+            <column name="product_id"/>
+            <column name="period"/>
+            <column name="orders_count"/>
+            <column name="linked_product_id"/>
+        </index>
+
+        <!-- Prune path: DELETE WHERE period < cutoff LIMIT 50000. -->
+        <index referenceId="MAGENX_AUTO_LINK_COPURCHASE_PERIOD" indexType="btree">
+            <column name="period"/>
+        </index>
+
+        <!-- No foreign keys to catalog_product_entity on purpose: this is a
+             derived analytics table that may legitimately outlive a deleted
+             product, the writer filters against the catalog anyway, and FKs
+             would markedly slow the bulk INSERT ... SELECT. Stale rows age out
+             with their period. -->
+    </table>
+</schema>
