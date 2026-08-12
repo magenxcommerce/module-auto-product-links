@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/magenxcommerce/module-auto-product-links/compare/v1.0.0...v1.0.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* Refactor CandidateIndex building into pool and source phases ([4120418](https://github.com/magenxcommerce/module-auto-product-links/commit/41204186c22ad2ef20f6f49e8c8b4cdea0851601))
+
 ## 1.0.0 (2026-08-11)
 
 
