@@ -80,8 +80,14 @@ class CoPurchase
      *    Bundles are the same shape. Keeping only the parents removes the double
      *    count AND yields the product the storefront actually links to, since a
      *    link hanging off an invisible variant renders nothing on the product
-     *    page. No product_type filter is needed for that, and adding one would
-     *    wrongly drop configurables altogether.
+     *    page. Note this is what handles configurables and bundles correctly -
+     *    it is a parent_item_id test, NOT a product_type test, so configurables
+     *    are kept rather than filtered out.
+     *
+     *    The one product_type exclusion in the query is 'grouped', for a
+     *    different reason: a grouped parent is a display container whose
+     *    children are ordered as independent top-level lines, so it never
+     *    represents something a customer actually bought alongside anything.
      * 2. The symmetric join (`b.product_id <> a.product_id`, not `<`) emits both
      *    A->B and B->A in one pass, which is what makes the read a pure
      *    `product_id IN (...)` seek on the covering index.
@@ -156,6 +162,10 @@ class CoPurchase
 
     /**
      * The order-id range and count for one period, used to slice the mining run.
+     *
+     * `count` is an upper bound, not the number of rows the miner will actually
+     * aggregate: accumulateSlice() additionally drops canceled orders and orders
+     * above the per-order line limit. It is used to size the run, not to report.
      *
      * @param string $periodStart
      * @param string $periodEnd

@@ -34,6 +34,8 @@ class CandidateIndex
      * @param array<int, float> $price productId => price (sources included)
      * @param array<int, int> $pricedIds ascending-by-price list of candidate ids
      * @param float[] $sortedPrices the prices of $pricedIds, same order (for bsearch)
+     * @param bool $hasSignatureConstraint whether the rule selected any match attribute
+     * @param bool $hasCategoryConstraint whether the rule selected __category
      */
     public function __construct(
         private readonly array $allIds,
@@ -44,7 +46,9 @@ class CandidateIndex
         private readonly array $categoriesOf,
         private readonly array $price,
         private readonly array $pricedIds,
-        private readonly array $sortedPrices
+        private readonly array $sortedPrices,
+        private readonly bool $hasSignatureConstraint = false,
+        private readonly bool $hasCategoryConstraint = false
     ) {
     }
 
@@ -68,7 +72,12 @@ class CandidateIndex
      */
     public function candidatesBySignature(int $sourceId): ?array
     {
-        if (!$this->bySignature) {
+        // Keyed on whether the rule ASKED for this dimension, not on whether the
+        // bucket map came out non-empty. Inferring it from emptiness fails open:
+        // a rule matching on colour, over a pool where no candidate has a colour
+        // value, would read as "no attribute constraint configured" and link to
+        // the entire pool. A misconfigured rule must link nothing.
+        if (!$this->hasSignatureConstraint) {
             return null;
         }
 
@@ -91,7 +100,10 @@ class CandidateIndex
      */
     public function candidatesByCategory(int $sourceId): ?array
     {
-        if (!$this->byCategory) {
+        // Same reasoning as candidatesBySignature(): an empty inverted map means
+        // no candidate sits in a navigable category, which narrows to nothing -
+        // it does not mean the merchant left the constraint off.
+        if (!$this->hasCategoryConstraint) {
             return null;
         }
 
@@ -122,6 +134,12 @@ class CandidateIndex
      */
     public function candidatesByPriceBand(int $sourceId, int $percent): ?array
     {
+        // Deliberately asymmetric with the two dimensions above, which fail
+        // closed. A price band has an external precondition they do not have -
+        // the price index must have been built at least once - and an unindexed
+        // catalog is a routine state (fresh install, reindex in flight) rather
+        // than a misconfigured rule. Degrading to an unbanded match there beats
+        // silently emptying every rule that uses a band. See PriceMap::load().
         if (!$this->pricedIds) {
             return null;
         }

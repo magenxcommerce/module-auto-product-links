@@ -25,6 +25,15 @@ use Psr\Log\LoggerInterface;
  * id" watermark - is rejected because sales_order.entity_id has auto-increment
  * gaps under concurrency, so the safety-lag re-scan every such scheme needs
  * would double-count against the accumulating upsert.
+ *
+ * Which month is "current" is decided in the store timezone (a merchant's idea
+ * of the month), but the period BOUNDARIES handed to SQL are plain UTC days,
+ * matching sales_order.created_at. Orders placed within the timezone offset of
+ * a month boundary therefore land in the adjacent bucket. That is accepted: the
+ * read path sums six months of a heuristic, so a few hours of drift at two
+ * edges changes nothing. Do not "fix" it by passing the period back through
+ * TimezoneInterface::date() - see the comment in rebuildPeriod() for what that
+ * costs.
  */
 class CoPurchaseMiner
 {
@@ -67,7 +76,7 @@ class CoPurchaseMiner
             $rebuilt += $this->rebuildPeriod($period);
         }
 
-        $pruned = $this->coPurchase->prune($this->cutoffPeriod());
+        $pruned = $this->coPurchase->prune($this->config->getCoPurchaseCutoffPeriod());
 
         $this->logger->info(sprintf(
             'Magenx_AutoProductLinks: co-purchase mining done, %d pair rows written, %d aged rows pruned.',
@@ -83,9 +92,19 @@ class CoPurchaseMiner
     private function rebuildPeriod(string $period): int
     {
         $start = $period . ' 00:00:00';
-        $end = $this->timezone->date(new \DateTime($period))
-            ->modify('+1 month')
-            ->format('Y-m-01 00:00:00');
+
+        // Plain date arithmetic, deliberately NOT $this->timezone->date(): that
+        // method calls setTimezone() on the \DateTime it is handed, and the
+        // bootstrap pins date_default_timezone_set('UTC'), so '2026-08-01'
+        // becomes 2026-07-31 17:00 in any negative-offset store timezone.
+        // '+1 month' then lands on 2026-08-31 and format('Y-m-01') floors it
+        // straight back to the period we started from - an empty window, on
+        // every store in the Americas, silently wiping the month that
+        // clearPeriod() just dropped. The period is already a bare Y-m-01 day;
+        // it needs no timezone conversion, only a month added.
+        $end = (new \DateTimeImmutable($period))
+            ->modify('first day of next month')
+            ->format('Y-m-d 00:00:00');
 
         $range = $this->coPurchase->getOrderRange($start, $end);
         if ($range['count'] === 0) {
@@ -95,17 +114,27 @@ class CoPurchaseMiner
         }
 
         $maxOrders = $this->config->getMaxOrdersPerRun();
+
+        // The cap is expressed in orders but the run is sliced by entity_id, so
+        // it is applied as an id ceiling. entity_id has auto-increment gaps, so
+        // the ceiling covers AT MOST $maxOrders orders and usually slightly
+        // fewer - it is a safety bound, not an exact quota. The previous version
+        // tracked a $processed counter incremented by the slice WIDTH, which
+        // measured the id range walked rather than orders mined and stopped
+        // short of the range whenever the ids were sparse.
+        $idCeiling = min($range['max'], $range['min'] - 1 + $maxOrders);
+
         if ($range['count'] > $maxOrders) {
             // Say so rather than silently emitting a partial month: a truncated
             // aggregate looks exactly like a quiet month to whoever reads it.
             $this->logger->warning(sprintf(
                 'Magenx_AutoProductLinks: period %s holds %d orders, above the %d per-run limit. '
-                . 'Only the first %d orders were counted; raise the limit or the pairs for this month '
-                . 'will stay incomplete.',
+                . 'Mining stopped at order id %d, so the pairs for this month are incomplete; '
+                . 'raise the limit to cover the whole period.',
                 $period,
                 $range['count'],
                 $maxOrders,
-                $maxOrders
+                $idCeiling
             ));
         }
 
@@ -113,14 +142,12 @@ class CoPurchaseMiner
 
         $maxItems = $this->config->getMaxItemsPerOrder();
         $written = 0;
-        $processed = 0;
         $low = $range['min'] - 1;
 
-        while ($low < $range['max'] && $processed < $maxOrders) {
-            $high = $low + self::ORDER_SLICE;
+        while ($low < $idCeiling) {
+            $high = min($low + self::ORDER_SLICE, $idCeiling);
             $written += $this->coPurchase->accumulateSlice($period, $start, $end, $low, $high, $maxItems);
             $low = $high;
-            $processed += self::ORDER_SLICE;
         }
 
         return $written;
@@ -143,20 +170,5 @@ class CoPurchaseMiner
         }
 
         return $periods;
-    }
-
-    /**
-     * First day of the oldest month still inside the look-back window.
-     *
-     * @return string Y-m-01
-     */
-    private function cutoffPeriod(): string
-    {
-        $months = max(1, $this->config->getLookbackMonths());
-
-        return $this->timezone->date()
-            ->modify('first day of this month')
-            ->modify('-' . ($months - 1) . ' months')
-            ->format('Y-m-01');
     }
 }

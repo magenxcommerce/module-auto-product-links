@@ -27,7 +27,18 @@ class WriteResult
      */
     public int $manualSkipped = 0;
 
-    /** @var int[] source products whose links changed, for cache invalidation */
+    /**
+     * Source products whose links were ACTUALLY changed, for cache invalidation.
+     *
+     * Empty on a dry run, and that is load-bearing rather than an oversight:
+     * this list is the sole trigger for broadcasting cat_p_<id>, and a purge is
+     * not a harmless side effect - it drops the identity from every configured
+     * cache host and takes the headless storefront's rails with it. A run whose
+     * whole contract is "changed nothing" must not do that. Nothing else reads
+     * this field, so there is no report to keep it populated for.
+     *
+     * @var int[]
+     */
     public array $touchedProductIds = [];
 
     /**
@@ -43,8 +54,11 @@ class WriteResult
         $this->unchanged += $other->unchanged;
         $this->manualSkipped += $other->manualSkipped;
 
-        if ($other->touchedProductIds) {
-            $this->touchedProductIds = array_merge($this->touchedProductIds, $other->touchedProductIds);
+        // Appended rather than array_merge()d: merge() is called once per batch,
+        // and re-copying a list that grows to the per-run source cap on every
+        // one of them is quadratic for no reason.
+        foreach ($other->touchedProductIds as $productId) {
+            $this->touchedProductIds[] = $productId;
         }
     }
 

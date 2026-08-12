@@ -120,10 +120,18 @@ class LinkWriter
             $toDelete = array_values(array_diff($ownedIds, $desired));
             $toInsert = array_values(array_diff($desired, $ownedIds));
 
-            if (!$toDelete && !$toInsert) {
-                // Positions can still drift when the ranking changes without the
-                // membership changing; they are rewritten below for every
-                // desired link, so nothing is missed by skipping here.
+            // Membership AND order both have to match to skip. Comparing the two
+            // lists with === is what catches a re-ranking that keeps the same N
+            // products but reorders them: the diffs above are both empty in that
+            // case, and skipping on them alone would leave the stored positions
+            // stale forever. getOwned() returns its ids in stored position order
+            // precisely so this comparison is meaningful.
+            // Known gap, accepted: this compares ORDER, not the absolute values,
+            // so changing auto_position_base in config does not by itself rewrite
+            // positions - they pick the new base up the next time a rule's output
+            // for that product actually changes.
+            $reordered = !$toDelete && !$toInsert;
+            if ($reordered && $desired === $ownedIds) {
                 if ($desired) {
                     $result->unchanged += count($desired);
                 }
@@ -133,6 +141,13 @@ class LinkWriter
             $touched[$sourceId] = true;
             $result->deleted += count($toDelete);
             $result->inserted += count($toInsert);
+
+            // Same links, new order. They are still "already present and still
+            // wanted", so they count as unchanged rather than leaving the batch
+            // tallied as three zeroes while positions are being rewritten.
+            if ($reordered) {
+                $result->unchanged += count($desired);
+            }
 
             if ($dryRun) {
                 continue;
@@ -166,16 +181,20 @@ class LinkWriter
             }
         }
 
-        $result->touchedProductIds = array_keys($touched);
+        // Only real writes are reported as touched - see WriteResult::$touchedProductIds
+        // for why a dry run must not put anything in this list.
+        $result->touchedProductIds = $dryRun ? [] : array_keys($touched);
 
         if ($dryRun || (!$inserts && !$ledgerRows)) {
             return $result;
         }
 
-        // INSERT IGNORE: catalog_product_link's own unique key on
-        // (link_type_id, product_id, linked_product_id) makes a re-insert a
-        // no-op rather than an error, which keeps a concurrent admin save from
-        // failing the whole batch.
+        // The update column list is deliberately the no-op `link_type_id = itself`:
+        // catalog_product_link's unique key on (link_type_id, product_id,
+        // linked_product_id) means a row we are re-inserting is already exactly
+        // right, and this turns the collision into a no-op instead of an error -
+        // so a concurrent admin save cannot fail the whole batch. There is no
+        // insertIgnore() on the adapter; this is the idiom that stands in for it.
         if ($inserts) {
             $connection->insertOnDuplicate(
                 $this->resource->getTableName(self::LINK_TABLE),
@@ -184,7 +203,7 @@ class LinkWriter
             );
         }
 
-        $this->writePositions($linkTypeId, $ledgerRows);
+        $this->writePositions($linkTypeId, $ledgerRows, $existing, array_column($inserts, 'product_id'));
         $this->ledger->claim($ledgerRows);
 
         return $result;
@@ -221,17 +240,26 @@ class LinkWriter
     /**
      * Write the position of every desired link.
      *
-     * The link ids are re-read for the whole batch in one query rather than
+     * Link ids for freshly inserted rows are re-read in one query rather than
      * chased through LAST_INSERT_ID, which does not survive a multi-row insert.
+     * Only the sources that actually gained a link need that re-read - every
+     * other source's ids are already in the map apply() loaded before the write,
+     * and a pure re-ranking (same links, new order) needs no extra query at all.
      * Only links in $rows get a position, so a manual link's position is never
      * rewritten.
      *
      * @param int $linkTypeId
      * @param array<int, array{product_id:int, linked_product_id:int, position:int}> $rows
+     * @param array<int, array<int, int>> $known productId => [linkedProductId => linkId], pre-insert
+     * @param int[] $insertedSourceIds sources that gained at least one link
      * @return void
      */
-    private function writePositions(int $linkTypeId, array $rows): void
-    {
+    private function writePositions(
+        int $linkTypeId,
+        array $rows,
+        array $known,
+        array $insertedSourceIds
+    ): void {
         if (!$rows) {
             return;
         }
@@ -241,8 +269,12 @@ class LinkWriter
             return;
         }
 
-        $sourceIds = array_values(array_unique(array_column($rows, 'product_id')));
-        $existing = $this->loadExisting($sourceIds, $linkTypeId);
+        $existing = $known;
+        $needRefresh = array_values(array_unique($insertedSourceIds));
+        if ($needRefresh) {
+            // Union, not replace: the re-read covers only the refreshed sources.
+            $existing = $this->loadExisting($needRefresh, $linkTypeId) + $existing;
+        }
 
         $values = [];
         foreach ($rows as $row) {

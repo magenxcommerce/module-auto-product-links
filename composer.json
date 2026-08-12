@@ -11,11 +11,16 @@
         "magento/module-catalog": "*",
         "magento/module-catalog-rule": "*",
         "magento/module-catalog-widget": "*",
+        "magento/module-config": "*",
+        "magento/module-cron": "*",
         "magento/module-eav": "*",
         "magento/module-rule": "*",
         "magento/module-sales": "*",
         "magento/module-store": "*",
         "magento/module-ui": "*"
+    },
+    "suggest": {
+        "magento/module-reports": "Enables the default 'Best sellers first' ranking, which reads sales_bestsellers_aggregated_monthly. Without it that ranking degrades to the candidate pool's own order; every other ranking is unaffected."
     },
     "type": "magento2-module",
     "license": [

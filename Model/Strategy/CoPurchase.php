@@ -12,7 +12,6 @@ use Magenx\AutoProductLinks\Model\Config;
 use Magenx\AutoProductLinks\Model\Ranker;
 use Magenx\AutoProductLinks\Model\ResourceModel\CoPurchase as CoPurchaseResource;
 use Magenx\AutoProductLinks\Model\Rule;
-use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Magento\Store\Model\StoreManagerInterface;
 
 /**
@@ -34,13 +33,11 @@ class CoPurchase implements TargetStrategyInterface
     /**
      * @param CoPurchaseResource $coPurchase
      * @param Config $config
-     * @param TimezoneInterface $timezone
      * @param StoreManagerInterface $storeManager
      */
     public function __construct(
         private readonly CoPurchaseResource $coPurchase,
         private readonly Config $config,
-        private readonly TimezoneInterface $timezone,
         private readonly StoreManagerInterface $storeManager
     ) {
     }
@@ -68,7 +65,7 @@ class CoPurchase implements TargetStrategyInterface
     {
         $storeId = (int) $rule->getData('store_id');
         $storeIds = $this->resolveStoreIds($storeId);
-        $cutoff = $this->cutoffPeriod($storeId);
+        $cutoff = $this->config->getCoPurchaseCutoffPeriod($storeId);
 
         $partners = $this->coPurchase->getPartners(
             $storeIds,
@@ -111,7 +108,14 @@ class CoPurchase implements TargetStrategyInterface
                 if ($set === null) {
                     continue;
                 }
-                $candidates = array_values(array_intersect($candidates, $set));
+                // Hash lookups against a flipped set rather than
+                // array_intersect, which compares by string cast. Same reasoning
+                // as AttributeMatch: this runs once per source product.
+                $lookup = array_flip($set);
+                $candidates = array_values(array_filter(
+                    $candidates,
+                    static fn (int $id): bool => isset($lookup[$id])
+                ));
                 if (!$candidates) {
                     break;
                 }
@@ -156,21 +160,5 @@ class CoPurchase implements TargetStrategyInterface
         }
 
         return $ids ?: [0];
-    }
-
-    /**
-     * First day of the oldest month still inside the look-back window.
-     *
-     * @param int $storeId
-     * @return string Y-m-01
-     */
-    private function cutoffPeriod(int $storeId): string
-    {
-        $months = max(1, $this->config->getLookbackMonths($storeId));
-
-        return $this->timezone->date()
-            ->modify('first day of this month')
-            ->modify('-' . ($months - 1) . ' months')
-            ->format('Y-m-01');
     }
 }
