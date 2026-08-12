@@ -111,7 +111,14 @@ class CoPurchase implements TargetStrategyInterface
                 if ($set === null) {
                     continue;
                 }
-                $candidates = array_values(array_intersect($candidates, $set));
+                // Hash lookups against a flipped set rather than
+                // array_intersect, which compares by string cast. Same reasoning
+                // as AttributeMatch: this runs once per source product.
+                $lookup = array_flip($set);
+                $candidates = array_values(array_filter(
+                    $candidates,
+                    static fn (int $id): bool => isset($lookup[$id])
+                ));
                 if (!$candidates) {
                     break;
                 }

@@ -114,17 +114,27 @@ class CoPurchaseMiner
         }
 
         $maxOrders = $this->config->getMaxOrdersPerRun();
+
+        // The cap is expressed in orders but the run is sliced by entity_id, so
+        // it is applied as an id ceiling. entity_id has auto-increment gaps, so
+        // the ceiling covers AT MOST $maxOrders orders and usually slightly
+        // fewer - it is a safety bound, not an exact quota. The previous version
+        // tracked a $processed counter incremented by the slice WIDTH, which
+        // measured the id range walked rather than orders mined and stopped
+        // short of the range whenever the ids were sparse.
+        $idCeiling = min($range['max'], $range['min'] - 1 + $maxOrders);
+
         if ($range['count'] > $maxOrders) {
             // Say so rather than silently emitting a partial month: a truncated
             // aggregate looks exactly like a quiet month to whoever reads it.
             $this->logger->warning(sprintf(
                 'Magenx_AutoProductLinks: period %s holds %d orders, above the %d per-run limit. '
-                . 'Only the first %d orders were counted; raise the limit or the pairs for this month '
-                . 'will stay incomplete.',
+                . 'Mining stopped at order id %d, so the pairs for this month are incomplete; '
+                . 'raise the limit to cover the whole period.',
                 $period,
                 $range['count'],
                 $maxOrders,
-                $maxOrders
+                $idCeiling
             ));
         }
 
@@ -132,14 +142,12 @@ class CoPurchaseMiner
 
         $maxItems = $this->config->getMaxItemsPerOrder();
         $written = 0;
-        $processed = 0;
         $low = $range['min'] - 1;
 
-        while ($low < $range['max'] && $processed < $maxOrders) {
-            $high = $low + self::ORDER_SLICE;
+        while ($low < $idCeiling) {
+            $high = min($low + self::ORDER_SLICE, $idCeiling);
             $written += $this->coPurchase->accumulateSlice($period, $start, $end, $low, $high, $maxItems);
             $low = $high;
-            $processed += self::ORDER_SLICE;
         }
 
         return $written;

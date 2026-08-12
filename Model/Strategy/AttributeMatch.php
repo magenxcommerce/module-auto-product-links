@@ -71,14 +71,27 @@ class AttributeMatch implements TargetStrategyInterface
             } else {
                 $candidates = array_shift($sets);
                 foreach ($sets as $set) {
-                    $candidates = array_intersect($candidates, $set);
+                    // Hash lookups against a flipped set, not array_intersect:
+                    // that function casts every element to string to compare,
+                    // and this is the innermost loop of the whole run - once per
+                    // source product, over sets that can hold thousands of ids.
+                    $lookup = array_flip($set);
+                    $candidates = array_values(array_filter(
+                        $candidates,
+                        static fn (int $id): bool => isset($lookup[$id])
+                    ));
                     if (!$candidates) {
                         break;
                     }
                 }
             }
 
-            $candidates = array_values(array_diff($candidates, [$sourceId]));
+            // A plain filter, not array_diff: removing one known id does not
+            // justify a full diff (and its string casts).
+            $candidates = array_values(array_filter(
+                $candidates,
+                static fn (int $id): bool => $id !== $sourceId
+            ));
             if (!$candidates) {
                 continue;
             }
