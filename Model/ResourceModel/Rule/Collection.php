@@ -30,31 +30,17 @@ class Collection extends \Magento\Rule\Model\ResourceModel\Rule\Collection\Abstr
      * equal-priority rules alternately claiming the same link and churning the
      * storefront cache every night.
      *
-     * @param string|null $linkType
+     * Note there is deliberately no active filter to pair with this. RuleRunner
+     * has to see inactive and expired rules so it can RELEASE the links they own
+     * - filtering them out would strand those links in the catalog forever. Date
+     * eligibility is likewise decided per rule in Rule::isRunnableNow(), which
+     * compares in the store timezone and so cannot be pushed into SQL.
+     *
      * @return $this
      */
-    public function addRunOrder(?string $linkType = null): self
+    public function addRunOrder(): self
     {
-        if ($linkType !== null) {
-            $this->addFieldToFilter('link_type', $linkType);
-        }
-
         $this->getSelect()->order('sort_order ASC')->order('rule_id ASC');
-
-        return $this;
-    }
-
-    /**
-     * Only active rules.
-     *
-     * Date eligibility is NOT filtered here - it is evaluated per rule in
-     * Rule::isRunnableNow(), which compares in the store timezone.
-     *
-     * @return $this
-     */
-    public function addActiveFilter(): self
-    {
-        $this->addFieldToFilter('is_active', 1);
 
         return $this;
     }

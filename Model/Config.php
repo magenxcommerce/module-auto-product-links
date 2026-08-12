@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace Magenx\AutoProductLinks\Model;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Magento\Store\Model\ScopeInterface;
 
 /**
@@ -48,9 +49,11 @@ class Config
 
     /**
      * @param ScopeConfigInterface $scopeConfig
+     * @param TimezoneInterface $timezone
      */
     public function __construct(
-        private readonly ScopeConfigInterface $scopeConfig
+        private readonly ScopeConfigInterface $scopeConfig,
+        private readonly TimezoneInterface $timezone
     ) {
     }
 
@@ -194,6 +197,32 @@ class Config
     public function getMaxItemsPerOrder(?int $storeId = null): int
     {
         return $this->positiveInt(self::XML_PATH_MAX_ITEMS_PER_ORDER, self::DEFAULT_MAX_ITEMS_PER_ORDER, $storeId);
+    }
+
+    /**
+     * First day of the oldest month still inside the co-purchase look-back window.
+     *
+     * Lives here because the miner (which prunes anything older) and the
+     * co-purchase strategy (which sums anything newer) have to agree on it
+     * exactly; they previously carried byte-identical private copies, which is
+     * one edit away from the reader and the writer disagreeing about what is
+     * still in the window.
+     *
+     * Anchored on the store's "now" so the window matches the merchant's idea of
+     * a month, then formatted as a bare day - the value is compared against the
+     * `period` date column, not against a timestamp.
+     *
+     * @param int|null $storeId
+     * @return string Y-m-01
+     */
+    public function getCoPurchaseCutoffPeriod(?int $storeId = null): string
+    {
+        $months = max(1, $this->getLookbackMonths($storeId));
+
+        return $this->timezone->date()
+            ->modify('first day of this month')
+            ->modify('-' . ($months - 1) . ' months')
+            ->format('Y-m-01');
     }
 
     /**

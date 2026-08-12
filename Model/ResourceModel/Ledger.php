@@ -85,7 +85,8 @@ class Ledger
      * claim it wins, which combined with the deterministic run order makes a run
      * reproducible).
      *
-     * @param array<int, array{rule_id:int, product_id:int, linked_product_id:int, link_type_id:int, position:int}> $rows
+     * @param array<int, array{rule_id:int, product_id:int, linked_product_id:int,
+     *     link_type_id:int, position:int}> $rows
      * @return int
      */
     public function claim(array $rows): int

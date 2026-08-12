@@ -76,7 +76,7 @@ class CoPurchaseMiner
             $rebuilt += $this->rebuildPeriod($period);
         }
 
-        $pruned = $this->coPurchase->prune($this->cutoffPeriod());
+        $pruned = $this->coPurchase->prune($this->config->getCoPurchaseCutoffPeriod());
 
         $this->logger->info(sprintf(
             'Magenx_AutoProductLinks: co-purchase mining done, %d pair rows written, %d aged rows pruned.',
@@ -170,20 +170,5 @@ class CoPurchaseMiner
         }
 
         return $periods;
-    }
-
-    /**
-     * First day of the oldest month still inside the look-back window.
-     *
-     * @return string Y-m-01
-     */
-    private function cutoffPeriod(): string
-    {
-        $months = max(1, $this->config->getLookbackMonths());
-
-        return $this->timezone->date()
-            ->modify('first day of this month')
-            ->modify('-' . ($months - 1) . ' months')
-            ->format('Y-m-01');
     }
 }

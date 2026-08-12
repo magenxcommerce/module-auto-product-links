@@ -26,7 +26,10 @@ class LinkType implements OptionSourceInterface
         return [
             ['value' => Rule::LINK_TYPE_RELATED, 'label' => __('Related Products')],
             ['value' => Rule::LINK_TYPE_UPSELL, 'label' => __('Up-Sells')],
-            ['value' => Rule::LINK_TYPE_CROSSSELL, 'label' => __('Cross-Sells (shown as "Frequently Bought Together")')],
+            [
+                'value' => Rule::LINK_TYPE_CROSSSELL,
+                'label' => __('Cross-Sells (shown as "Frequently Bought Together")'),
+            ],
         ];
     }
 }

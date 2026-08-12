@@ -23,6 +23,15 @@
             <module name="Magento_Store"/>
             <module name="Magento_Backend"/>
             <module name="Magento_Ui"/>
+            <!-- etc/crontab.xml, and the config-path schedules it reads. -->
+            <module name="Magento_Cron"/>
+            <!-- The Yes/No and Enable/Disable source models used by
+                 etc/adminhtml/system.xml and the rule listing. -->
+            <module name="Magento_Config"/>
+            <!-- NOT sequenced, and not required: Magento_Reports owns
+                 sales_bestsellers_aggregated_monthly, which Model/Ranker reads
+                 for the bestsellers ranking behind an isTableExists() guard and
+                 degrades cleanly without. Listed in composer's `suggest`. -->
         </sequence>
     </module>
 </config>
