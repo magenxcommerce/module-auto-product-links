@@ -94,6 +94,8 @@ class RuleRunner
             }
         }
 
+        // touchedProductIds carries only products that were really written, so a
+        // dry run reaches here with an empty list and broadcasts nothing.
         if ($total->touchedProductIds && $this->config->shouldInvalidateCache()) {
             $this->cacheInvalidator->invalidateProducts($total->touchedProductIds);
         }

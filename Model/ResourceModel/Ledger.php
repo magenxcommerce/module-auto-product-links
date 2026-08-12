@@ -42,9 +42,15 @@ class Ledger
      * Reads on the unique key (product_id leads), so the IN set is a range scan
      * and link_type_id filters within it.
      *
+     * Ordered by stored position, with linked_product_id as a tie-break so the
+     * order is total. LinkWriter compares the returned list against the desired
+     * one with === to detect a re-ranking that kept the same membership; without
+     * a deterministic order that comparison would report a spurious difference
+     * on every run and rewrite positions that had not moved.
+     *
      * @param int[] $productIds
      * @param int $linkTypeId
-     * @return array<int, int[]> sourceProductId => linkedProductId[]
+     * @return array<int, int[]> sourceProductId => linkedProductId[] in position order
      */
     public function getOwned(array $productIds, int $linkTypeId): array
     {
@@ -59,6 +65,8 @@ class Ledger
                 ->from($this->resource->getTableName(self::TABLE), ['product_id', 'linked_product_id'])
                 ->where('link_type_id = ?', $linkTypeId)
                 ->where('product_id IN (?)', $productIds)
+                ->order('position ASC')
+                ->order('linked_product_id ASC')
         );
 
         $owned = [];
