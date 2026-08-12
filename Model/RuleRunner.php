@@ -203,8 +203,15 @@ class RuleRunner
         $batchSize = $this->config->getBatchSize($storeId);
         $connection = $this->resource->getConnection();
 
+        // Built ONCE, outside the batch loop. Everything in it depends on the
+        // rule and its candidate pool only; folding a batch onto it is the cheap
+        // per-batch half. Building it inside the loop instead re-ran the pool's
+        // attribute, category and price queries - and the ranking, bestsellers
+        // aggregate included - for every batch.
+        $poolIndex = $this->indexBuilder->buildPool($rule, $pool['ids'], $storeId, $websiteId);
+
         foreach (array_chunk($sources, $batchSize) as $batch) {
-            $index = $this->indexBuilder->build($rule, $pool['ids'], $batch, $storeId, $websiteId);
+            $index = $this->indexBuilder->withSources($poolIndex, $batch, $storeId, $websiteId);
             $desired = $strategy->resolve($rule, $batch, $index, $maxLinks);
 
             if ($dryRun) {
