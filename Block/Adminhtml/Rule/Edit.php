@@ -61,15 +61,21 @@ class Edit extends Container
         // Only offered on a saved rule: running an unsaved one would silently
         // use the last saved conditions, which reads as the button not working.
         if ($rule && $rule->getId()) {
+            // A POST, not setLocation(): the run action writes
+            // catalog_product_link, and only POSTs get form-key validation. The
+            // url/data pair is what Magento's own confirmSetLocation-free POST
+            // buttons use, and it carries the form key automatically.
             $this->addButton(
                 'run_now',
                 [
                     'label' => __('Run Now'),
                     'class' => 'secondary',
-                    'onclick' => sprintf(
-                        "setLocation('%s')",
-                        $this->getUrl('*/*/run', ['rule_id' => $rule->getId()])
-                    ),
+                    'data_attribute' => [
+                        'post' => [
+                            'action' => $this->getUrl('*/*/run', ['rule_id' => $rule->getId()]),
+                            'data' => ['rule_id' => $rule->getId()],
+                        ],
+                    ],
                 ],
                 20
             );

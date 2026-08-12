@@ -12,6 +12,7 @@ use Magenx\AutoProductLinks\Model\RuleFactory;
 use Magenx\AutoProductLinks\Model\RuleRunner;
 use Magenx\AutoProductLinks\Model\RunCursor;
 use Magento\Backend\App\Action\Context;
+use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\Registry;
@@ -23,8 +24,15 @@ use Magento\Framework\Registry;
  * says so, rather than pretending to have processed a whole catalog inside an
  * HTTP request. The cursor is reset first so the merchant sees the effect on the
  * beginning of the catalog, which is what they will go and check.
+ *
+ * POST-only, like Save and Delete. This action writes catalog_product_link, and
+ * Magento only form-key-validates state-changing admin requests that arrive as
+ * POST; a GET one leans entirely on admin secret keys, which are routinely
+ * switched off behind SSO. A GET catalog write is also bookmarkable and
+ * prefetchable by the browser. The button in Block\Adminhtml\Rule\Edit posts
+ * accordingly - do not revert it to setLocation().
  */
-class Run extends Rule
+class Run extends Rule implements HttpPostActionInterface
 {
     /**
      * @param Context $context
