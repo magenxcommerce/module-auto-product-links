@@ -25,6 +25,15 @@ use Psr\Log\LoggerInterface;
  * id" watermark - is rejected because sales_order.entity_id has auto-increment
  * gaps under concurrency, so the safety-lag re-scan every such scheme needs
  * would double-count against the accumulating upsert.
+ *
+ * Which month is "current" is decided in the store timezone (a merchant's idea
+ * of the month), but the period BOUNDARIES handed to SQL are plain UTC days,
+ * matching sales_order.created_at. Orders placed within the timezone offset of
+ * a month boundary therefore land in the adjacent bucket. That is accepted: the
+ * read path sums six months of a heuristic, so a few hours of drift at two
+ * edges changes nothing. Do not "fix" it by passing the period back through
+ * TimezoneInterface::date() - see the comment in rebuildPeriod() for what that
+ * costs.
  */
 class CoPurchaseMiner
 {
@@ -83,9 +92,19 @@ class CoPurchaseMiner
     private function rebuildPeriod(string $period): int
     {
         $start = $period . ' 00:00:00';
-        $end = $this->timezone->date(new \DateTime($period))
-            ->modify('+1 month')
-            ->format('Y-m-01 00:00:00');
+
+        // Plain date arithmetic, deliberately NOT $this->timezone->date(): that
+        // method calls setTimezone() on the \DateTime it is handed, and the
+        // bootstrap pins date_default_timezone_set('UTC'), so '2026-08-01'
+        // becomes 2026-07-31 17:00 in any negative-offset store timezone.
+        // '+1 month' then lands on 2026-08-31 and format('Y-m-01') floors it
+        // straight back to the period we started from - an empty window, on
+        // every store in the Americas, silently wiping the month that
+        // clearPeriod() just dropped. The period is already a bare Y-m-01 day;
+        // it needs no timezone conversion, only a month added.
+        $end = (new \DateTimeImmutable($period))
+            ->modify('first day of next month')
+            ->format('Y-m-d 00:00:00');
 
         $range = $this->coPurchase->getOrderRange($start, $end);
         if ($range['count'] === 0) {
