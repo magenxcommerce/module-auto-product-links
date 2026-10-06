@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/magenxcommerce/module-auto-product-links/compare/v1.0.2...v1.0.3) (2026-10-06)
+
+
+### Bug Fixes
+
+* Fix PHP 8 compatibility issue with Visibility method call ([#10](https://github.com/magenxcommerce/module-auto-product-links/issues/10)) ([d7da32a](https://github.com/magenxcommerce/module-auto-product-links/commit/d7da32aeaddacf4850564b9336c73d92d50f9a0a))
+
 ## [1.0.2](https://github.com/magenxcommerce/module-auto-product-links/compare/v1.0.1...v1.0.2) (2026-10-06)
 
 
