@@ -94,6 +94,9 @@ class Rule extends \Magento\Rule\Model\ResourceModel\AbstractResource
                 $matchAttributes
             )));
             $object->setData('match_attributes', $clean === [] ? null : $this->jsonSerializer->serialize($clean));
+        } elseif ($matchAttributes === '') {
+            // The multiselect's can_be_empty hidden input: everything deselected.
+            $object->setData('match_attributes', null);
         }
 
         // An empty price band means "no band", not "a band of zero percent".

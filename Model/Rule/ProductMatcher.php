@@ -32,10 +32,12 @@ class ProductMatcher
     /**
      * @param CollectionFactory $collectionFactory
      * @param SqlBuilder $sqlBuilder
+     * @param Visibility $visibility
      */
     public function __construct(
         private readonly CollectionFactory $collectionFactory,
-        private readonly SqlBuilder $sqlBuilder
+        private readonly SqlBuilder $sqlBuilder,
+        private readonly Visibility $visibility
     ) {
     }
 
@@ -63,7 +65,9 @@ class ProductMatcher
         // leaving a short rail with no explanation. Applied to the SOURCE side
         // too, not just the target - a rule matching invisible variants would
         // otherwise write links nobody can ever see.
-        $collection->setVisibility(Visibility::getVisibleInCatalogIds());
+        // An instance call: getVisibleInCatalogIds() is not static, and calling it
+        // statically is a fatal Error on PHP 8 - which failed every rule.
+        $collection->setVisibility($this->visibility->getVisibleInCatalogIds());
 
         // Joins in exactly the attributes the tree references - no more.
         $tree->collectValidatedAttributes($collection);

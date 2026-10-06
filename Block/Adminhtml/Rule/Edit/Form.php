@@ -100,7 +100,12 @@ class Form extends Generic
         $this->addConditionsFieldset($form, $model);
         $this->addActionsFieldset($form, $model);
 
-        $form->setValues($model->getData());
+        // match_attributes is stored as a JSON list, but the multiselect only
+        // understands an array or a comma-separated string - handed the raw
+        // JSON it pre-selects nothing, and the saved choice looks lost.
+        $values = $model->getData();
+        $values['match_attributes'] = $model->getMatchAttributes();
+        $form->setValues($values);
         $form->setUseContainer(true);
         $this->setForm($form);
 
@@ -218,6 +223,10 @@ class Form extends Generic
 
         $fieldset->addField('match_attributes', 'multiselect', [
             'name' => 'match_attributes[]',
+            // Posts an empty value when nothing is selected. Without it a
+            // multiselect cleared to nothing is simply absent from the POST, and
+            // the rule silently keeps its previous match attributes.
+            'can_be_empty' => true,
             'label' => __('Must Match the Source Product On'),
             'title' => __('Must Match the Source Product On'),
             'values' => $this->matchAttributesSource->toOptionArray(),
