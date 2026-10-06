@@ -32,6 +32,9 @@ class Save extends Rule implements \Magento\Framework\App\Action\HttpPostActionI
     /** Sanity ceiling on the price band half-width. */
     private const MAX_PRICE_BAND_PERCENT = 1000;
 
+    /** Ceiling on "pick from the best N": each source walks this many candidates. */
+    private const MAX_PICK_FROM_TOP = 1000;
+
     /**
      * @param Context $context
      * @param Registry $coreRegistry
@@ -73,10 +76,7 @@ class Save extends Rule implements \Magento\Framework\App\Action\HttpPostActionI
                 }
             }
 
-            // loadPost() is what maps BOTH condition trees out of the POST -
-            // core AbstractModel behaviour, so nothing here has to know how the
-            // tree is encoded.
-            $rule->loadPost($data);
+            $rule->loadAdminPost($data);
 
             $this->validate($rule);
             $rule->save();
@@ -144,6 +144,28 @@ class Save extends Rule implements \Magento\Framework\App\Action\HttpPostActionI
             self::MAX_PRICE_BAND_PERCENT,
             __('Price Band (%)')
         );
+
+        $this->assertInRange(
+            $rule,
+            'pick_from_top',
+            0,
+            self::MAX_PICK_FROM_TOP,
+            __('Randomly Pick From the Best')
+        );
+        if ((string) $rule->getData('pick_from_top') === '') {
+            $rule->setData('pick_from_top', null);
+        }
+
+        // Frequently Bought Together means "bought together", so it only ever
+        // comes from order history. Letting it take "similar products" would
+        // just make it a second Related Products rail.
+        if ((string) $rule->getData('link_type') === \Magenx\AutoProductLinks\Model\Rule::LINK_TYPE_BOUGHT_TOGETHER
+            && (string) $rule->getData('target_strategy') !== \Magenx\AutoProductLinks\Model\Rule::STRATEGY_CO_PURCHASE
+        ) {
+            throw new LocalizedException(
+                __('Frequently Bought Together rules must choose products by "Bought together (from order history)".')
+            );
+        }
 
         $matchAttributes = $rule->getMatchAttributes();
 

@@ -40,17 +40,16 @@ class ProductMatcher
     }
 
     /**
-     * Product ids matching the tree, capped.
+     * Product ids matching the tree.
      *
      * @param Combine $tree
      * @param int $storeId
-     * @param int $limit
-     * @param int $afterProductId resume cursor: only ids strictly greater than this
+     * @param int|null $limit null for every match
      * @return int[] ascending by entity_id
      */
-    public function match(Combine $tree, int $storeId, int $limit, int $afterProductId = 0): array
+    public function match(Combine $tree, int $storeId, ?int $limit = null): array
     {
-        if ($limit < 1) {
+        if ($limit !== null && $limit < 1) {
             return [];
         }
 
@@ -73,15 +72,16 @@ class ProductMatcher
         $select = $collection->getSelect();
         $select->reset(Select::COLUMNS)->columns(['entity_id' => 'e.entity_id']);
 
-        if ($afterProductId > 0) {
-            $select->where('e.entity_id > ?', $afterProductId);
-        }
+        // A condition on a multi-valued attribute can join a product more than
+        // once; ids only, so DISTINCT is cheap.
+        $select->distinct(true);
 
-        // Ordering by entity_id is what makes the resume cursor work: a run
-        // always continues from where the previous one stopped, so a catalog
-        // larger than the per-run cap converges over several nights instead of
-        // reprocessing the same prefix forever.
-        $select->order('e.entity_id ASC')->limit($limit);
+        // Ordered so a run is reproducible: the batches, and therefore the log
+        // and the order links are written in, are the same every night.
+        $select->order('e.entity_id ASC');
+        if ($limit !== null) {
+            $select->limit($limit);
+        }
 
         return array_map('intval', $collection->getConnection()->fetchCol($select));
     }

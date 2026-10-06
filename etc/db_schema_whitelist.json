@@ -17,6 +17,7 @@
             "price_band_percent": true,
             "max_links": true,
             "result_sort": true,
+            "pick_from_top": true,
             "created_at": true,
             "updated_at": true
         },

@@ -34,7 +34,7 @@
         <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" default="0"
                 comment="EVALUATION scope only - which store's attribute values, price index and orders are read. catalog_product_link has no store column, so the links themselves are always global."/>
         <column xsi:type="varchar" name="link_type" length="16" nullable="false" default="related"
-                comment="related | upsell | crosssell"/>
+                comment="related | upsell | crosssell | bought_together"/>
         <column xsi:type="varchar" name="target_strategy" length="32" nullable="false" default="attribute_match"
                 comment="attribute_match | co_purchase"/>
         <column xsi:type="mediumtext" name="conditions_serialized" nullable="true"
@@ -49,6 +49,8 @@
                 comment="Maximum auto links written per source product for this link type"/>
         <column xsi:type="varchar" name="result_sort" length="32" nullable="false" default="bestsellers"
                 comment="How the surviving candidates are ranked before truncation"/>
+        <column xsi:type="smallint" name="pick_from_top" unsigned="true" nullable="true"
+                comment="When set, links are a stable random pick of max_links from the best N ranked candidates instead of simply the best max_links"/>
         <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP"
                 comment="Created At"/>
         <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP"
@@ -89,7 +91,7 @@
         <column xsi:type="int" name="linked_product_id" unsigned="true" nullable="false"
                 comment="Linked (target) product entity ID"/>
         <column xsi:type="smallint" name="link_type_id" unsigned="true" nullable="false"
-                comment="Magento link type id: 1 related, 4 up-sell, 5 cross-sell"/>
+                comment="Magento link type id: 1 related, 4 up-sell, 5 cross-sell, or the module's own Frequently Bought Together type"/>
         <column xsi:type="int" name="position" nullable="false" default="0"
                 comment="Position written to catalog_product_link_attribute_int"/>
         <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP"

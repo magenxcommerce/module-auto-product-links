@@ -11,8 +11,8 @@ namespace Magenx\AutoProductLinks\Model;
  * pool - not on which source products are currently being processed.
  *
  * This split exists for one reason. A rule's source set is walked in batches
- * (batch_size, 100 by default) up to max_source_products_per_run (5000), so the
- * index used to be rebuilt fifty times per rule per night - and every rebuild
+ * (batch_size, 100 by default), so the index used to be rebuilt once per batch
+ * - fifty times per rule per night on a 5000-product catalog - and every rebuild
  * redid the whole pool side: one query per match attribute over the full
  * universe, the category membership query and its inversion, the price index
  * query, an O(n log n) sort of up to 5000 prices, and a re-rank of the pool
@@ -30,10 +30,7 @@ class PoolIndex
      * @param int[] $candidateIds the pool, normalised
      * @param int[] $ranked every candidate, in rank order
      * @param array<int, int> $rank candidateId => rank (0 = best)
-     * @param array<string, int[]> $bySignature signature => candidateId[]
-     * @param array<int, string> $signatureOf candidateId => signature
-     * @param array<int, int[]> $byCategory categoryId => candidateId[]
-     * @param array<int, int[]> $categoriesOf candidateId => categoryId[]
+    X
      * @param array<int, float> $price candidateId => price
      * @param array<int, int> $pricedIds ascending-by-price list of candidate ids
      * @param float[] $sortedPrices the prices of $pricedIds, same order

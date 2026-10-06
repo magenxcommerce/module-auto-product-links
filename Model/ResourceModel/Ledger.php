@@ -27,6 +27,7 @@ class Ledger
 {
     private const TABLE = 'magenx_auto_link_ledger';
     private const LINK_TABLE = 'catalog_product_link';
+    private const RELEASE_CHUNK = 500;
 
     /**
      * @param ResourceConnection $resource
@@ -182,6 +183,109 @@ class Ledger
         $connection->delete($ledgerTable, ['rule_id = ?' => $ruleId]);
 
         return $touched;
+    }
+
+    /**
+     * Every source product that has at least one module-owned link of a type.
+     *
+     * @param int $linkTypeId
+     * @return int[]
+     */
+    public function getOwnedProductIds(int $linkTypeId): array
+    {
+        $connection = $this->resource->getConnection();
+
+        return array_map('intval', $connection->fetchCol(
+            $connection->select()
+                ->distinct()
+                ->from($this->resource->getTableName(self::TABLE), ['product_id'])
+                ->where('link_type_id = ?', $linkTypeId)
+        ));
+    }
+
+    /**
+     * Source products a rule currently owns links on.
+     *
+     * @param int $ruleId
+     * @return int[]
+     */
+    public function getProductIdsByRule(int $ruleId): array
+    {
+        $connection = $this->resource->getConnection();
+
+        return array_map('intval', $connection->fetchCol(
+            $connection->select()
+                ->distinct()
+                ->from($this->resource->getTableName(self::TABLE), ['product_id'])
+                ->where('rule_id = ?', $ruleId)
+        ));
+    }
+
+    /**
+     * Number of module-owned links of a type on the given products.
+     *
+     * @param int $linkTypeId
+     * @param int[] $productIds
+     * @return int
+     */
+    public function countOwned(int $linkTypeId, array $productIds): int
+    {
+        $total = 0;
+        $connection = $this->resource->getConnection();
+        foreach (array_chunk($this->normalizeIds($productIds), self::RELEASE_CHUNK) as $chunk) {
+            $total += (int) $connection->fetchOne(
+                $connection->select()
+                    ->from($this->resource->getTableName(self::TABLE), [new \Zend_Db_Expr('COUNT(*)')])
+                    ->where('link_type_id = ?', $linkTypeId)
+                    ->where('product_id IN (?)', $chunk)
+            );
+        }
+
+        return $total;
+    }
+
+    /**
+     * Remove every module-owned link of one type from the given source products,
+     * from the catalog AND from the ledger, whichever rule owned them.
+     *
+     * Used at the end of a run for products no rule produced links for any
+     * more - a product that left a rule's conditions, or whose rule was switched
+     * off - so their old auto links do not linger forever. Manual links have no
+     * ledger row and are never matched by the join.
+     *
+     * @param int $linkTypeId
+     * @param int[] $productIds
+     * @return int links removed
+     */
+    public function releaseProducts(int $linkTypeId, array $productIds): int
+    {
+        $connection = $this->resource->getConnection();
+        $ledgerTable = $this->resource->getTableName(self::TABLE);
+        $linkTable = $this->resource->getTableName(self::LINK_TABLE);
+        $removed = 0;
+
+        foreach (array_chunk($this->normalizeIds($productIds), self::RELEASE_CHUNK) as $chunk) {
+            $connection->query(
+                sprintf(
+                    'DELETE cpl FROM %s AS cpl'
+                    . ' INNER JOIN %s AS mall'
+                    . ' ON mall.product_id = cpl.product_id'
+                    . ' AND mall.linked_product_id = cpl.linked_product_id'
+                    . ' AND mall.link_type_id = cpl.link_type_id'
+                    . ' WHERE mall.link_type_id = %d AND mall.product_id IN (%s)',
+                    $connection->quoteIdentifier($linkTable),
+                    $connection->quoteIdentifier($ledgerTable),
+                    $linkTypeId,
+                    implode(',', $chunk)
+                )
+            );
+            $removed += (int) $connection->delete($ledgerTable, [
+                'link_type_id = ?' => $linkTypeId,
+                'product_id IN (?)' => $chunk,
+            ]);
+        }
+
+        return $removed;
     }
 
     /**

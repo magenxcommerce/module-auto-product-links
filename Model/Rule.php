@@ -44,6 +44,14 @@ class Rule extends \Magento\Rule\Model\AbstractModel
     public const LINK_TYPE_RELATED = 'related';
     public const LINK_TYPE_UPSELL = 'upsell';
     public const LINK_TYPE_CROSSSELL = 'crosssell';
+    /**
+     * Frequently Bought Together. Not one of Magento's stock link types: it is a
+     * link type of this module's own (see Setup/Patch/Data/AddBoughtTogetherLinkType),
+     * kept apart from cross-sells because the two answer different questions -
+     * cross-sells are a merchandising choice shown in the cart, this one is what
+     * customers actually bought together, read from order history.
+     */
+    public const LINK_TYPE_BOUGHT_TOGETHER = 'bought_together';
 
     public const STRATEGY_ATTRIBUTE_MATCH = 'attribute_match';
     public const STRATEGY_CO_PURCHASE = 'co_purchase';
@@ -123,6 +131,44 @@ class Rule extends \Magento\Rule\Model\AbstractModel
     public function getActionsInstance(): \Magento\Rule\Model\Condition\Combine
     {
         return $this->combineFactory->create();
+    }
+
+    /**
+     * loadPost() for the admin rule form's POST.
+     *
+     * Moves both condition trees to the top-level keys loadPost() reads first.
+     * This is the step whose absence made every rule run with EMPTY trees. The
+     * tree widgets post their fields under the condition classes' element name
+     * - `parameters[conditions][1--1][...]` and `parameters[actions][...]`,
+     * because the CatalogWidget condition classes set $elementName =
+     * 'parameters' - while loadPost() only looks for top-level `conditions` /
+     * `actions` keys. Core's own rule save controllers do the same unwrap (for
+     * `rule[...]`); without it loadPost() finds no tree, the save succeeds, and
+     * both trees are stored empty - "every product" on both sides.
+     *
+     * `rule` is accepted too, for a form built on the CatalogRule condition
+     * classes.
+     *
+     * @param array $data
+     * @return $this
+     */
+    public function loadAdminPost(array $data): self
+    {
+        foreach (['parameters', 'rule'] as $wrapper) {
+            if (!isset($data[$wrapper]) || !is_array($data[$wrapper])) {
+                continue;
+            }
+            foreach (['conditions', 'actions'] as $tree) {
+                if (isset($data[$wrapper][$tree]) && is_array($data[$wrapper][$tree])) {
+                    $data[$tree] = $data[$wrapper][$tree];
+                }
+            }
+            unset($data[$wrapper]);
+        }
+
+        $this->loadPost($data);
+
+        return $this;
     }
 
     /**

@@ -10,11 +10,12 @@ use Magenx\AutoProductLinks\Model\Rule;
 use Magento\Framework\Data\OptionSourceInterface;
 
 /**
- * Which of Magento's three link types a rule fills.
+ * Which link type a rule fills.
  *
- * The labels name the storefront surface as well as the Magento field, because
- * "Cross-Sells" is what Magento calls the relationship while most storefronts
- * (this one included) present it as "Frequently Bought Together".
+ * The labels name the storefront surface as well as the Magento field. Cross-sells
+ * and Frequently Bought Together are deliberately separate: cross-sells are the
+ * merchant's own add-on suggestions shown in the cart, while Frequently Bought
+ * Together is the product page rail fed from real order history.
  */
 class LinkType implements OptionSourceInterface
 {
@@ -24,11 +25,12 @@ class LinkType implements OptionSourceInterface
     public function toOptionArray(): array
     {
         return [
-            ['value' => Rule::LINK_TYPE_RELATED, 'label' => __('Related Products')],
-            ['value' => Rule::LINK_TYPE_UPSELL, 'label' => __('Up-Sells')],
+            ['value' => Rule::LINK_TYPE_RELATED, 'label' => __('Related Products ("You May Also Like")')],
+            ['value' => Rule::LINK_TYPE_UPSELL, 'label' => __('Up-Sells ("We Also Recommend")')],
+            ['value' => Rule::LINK_TYPE_CROSSSELL, 'label' => __('Cross-Sells (shown in the cart)')],
             [
-                'value' => Rule::LINK_TYPE_CROSSSELL,
-                'label' => __('Cross-Sells (shown as "Frequently Bought Together")'),
+                'value' => Rule::LINK_TYPE_BOUGHT_TOGETHER,
+                'label' => __('Frequently Bought Together (from order history)'),
             ],
         ];
     }

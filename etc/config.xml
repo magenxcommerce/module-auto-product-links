@@ -9,10 +9,12 @@
     <default>
         <magenx_auto_product_links>
             <general>
-                <!-- Off by default: this module writes to a core catalog table. -->
-                <enabled>0</enabled>
-                <!-- On by default: the first run should report, not write. -->
-                <dry_run>1</dry_run>
+                <!-- On by default, together with the default rules seeded by
+                     Setup/Patch/Data/InstallDefaultRules: the first cron run after
+                     install relinks the whole catalog with nothing to configure.
+                     Hand-picked links are never touched (see the ledger). -->
+                <enabled>1</enabled>
+                <dry_run>0</dry_run>
                 <invalidate_cache>1</invalidate_cache>
                 <max_links_default>8</max_links_default>
                 <!-- Auto links start at 1000 so merchant-picked links (1..N) always
@@ -20,13 +22,14 @@
                 <auto_position_base>1000</auto_position_base>
             </general>
             <limits>
-                <max_source_products_per_run>5000</max_source_products_per_run>
-                <target_pool_cap>5000</target_pool_cap>
+                <!-- Memory guard, not a tuning knob: the default rules use the
+                     whole catalog as their candidate pool. -->
+                <target_pool_cap>200000</target_pool_cap>
                 <batch_size>100</batch_size>
             </limits>
             <copurchase>
                 <lookback_months>6</lookback_months>
-                <min_support>3</min_support>
+                <min_support>2</min_support>
                 <max_orders_per_run>100000</max_orders_per_run>
                 <max_items_per_order>50</max_items_per_order>
             </copurchase>

@@ -10,7 +10,8 @@ use Magenx\AutoProductLinks\Controller\Adminhtml\Rule;
 use Magenx\AutoProductLinks\Model\Config;
 use Magenx\AutoProductLinks\Model\RuleFactory;
 use Magenx\AutoProductLinks\Model\RuleRunner;
-use Magenx\AutoProductLinks\Model\RunCursor;
+use Magenx\AutoProductLinks\Model\CoPurchaseMiner;
+use Magenx\AutoProductLinks\Model\Rule as RuleModel;
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\ResultFactory;
@@ -18,12 +19,13 @@ use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\Registry;
 
 /**
- * "Run Now" for a single rule.
+ * "Run Now" from a rule's edit page.
  *
- * Runs ONE bounded batch synchronously - the same slice size the cron uses - and
- * says so, rather than pretending to have processed a whole catalog inside an
- * HTTP request. The cursor is reset first so the merchant sees the effect on the
- * beginning of the catalog, which is what they will go and check.
+ * Runs every rule of the rule's LINK TYPE, not the rule alone: which products a
+ * rule owns depends on the higher-priority rules of the same type (see
+ * RuleRunner), so running one in isolation would write a result the next cron
+ * run immediately overturns. A rule that reads order history refreshes the
+ * co-purchase aggregate first, so it does not run from an empty one.
  *
  * POST-only, like Save and Delete. This action writes catalog_product_link, and
  * Magento only form-key-validates state-changing admin requests that arrive as
@@ -39,7 +41,7 @@ class Run extends Rule implements HttpPostActionInterface
      * @param Registry $coreRegistry
      * @param RuleFactory $ruleFactory
      * @param RuleRunner $runner
-     * @param RunCursor $cursor
+     * @param CoPurchaseMiner $miner
      * @param Config $config
      */
     public function __construct(
@@ -47,7 +49,7 @@ class Run extends Rule implements HttpPostActionInterface
         Registry $coreRegistry,
         RuleFactory $ruleFactory,
         private readonly RuleRunner $runner,
-        private readonly RunCursor $cursor,
+        private readonly CoPurchaseMiner $miner,
         private readonly Config $config
     ) {
         parent::__construct($context, $coreRegistry, $ruleFactory);
@@ -76,14 +78,24 @@ class Run extends Rule implements HttpPostActionInterface
         }
 
         try {
-            $this->cursor->reset($ruleId);
-            $result = $this->runner->run($ruleId);
+            $rule = $this->ruleFactory->create()->load($ruleId);
+            if (!$rule->getId()) {
+                $this->messageManager->addErrorMessage(__('This rule no longer exists.'));
+
+                return $redirect->setPath('*/*/');
+            }
+
+            if ((string) $rule->getData('target_strategy') === RuleModel::STRATEGY_CO_PURCHASE) {
+                $this->miner->mine();
+            }
+
+            $result = $this->runner->run((string) $rule->getData('link_type'));
 
             if ($this->config->isDryRun()) {
                 $this->messageManager->addWarningMessage(
                     __(
-                        'Dry run is on, so nothing was written. The rule would have added %1 and removed %2 links, '
-                        . 'and would have left %3 of your own links untouched.',
+                        'Dry run is on, so nothing was written. The rules of this link type would have added %1 '
+                        . 'and removed %2 links, and would have left %3 of your own links untouched.',
                         $result->inserted,
                         $result->deleted,
                         $result->manualSkipped
@@ -92,8 +104,8 @@ class Run extends Rule implements HttpPostActionInterface
             } else {
                 $this->messageManager->addSuccessMessage(
                     __(
-                        'Added %1 and removed %2 links, leaving %3 of your own links untouched. '
-                        . 'Large catalogs continue in the background on the next scheduled run.',
+                        'Ran every rule of this link type: added %1 and removed %2 links, '
+                        . 'leaving %3 of your own links untouched.',
                         $result->inserted,
                         $result->deleted,
                         $result->manualSkipped

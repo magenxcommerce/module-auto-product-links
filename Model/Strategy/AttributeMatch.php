@@ -28,6 +28,14 @@ use Magenx\AutoProductLinks\Model\Rule;
 class AttributeMatch implements TargetStrategyInterface
 {
     /**
+     * @param Picker $picker
+     */
+    public function __construct(
+        private readonly Picker $picker
+    ) {
+    }
+
+    /**
      * @inheritDoc
      */
     public function getCode(): string
@@ -49,54 +57,62 @@ class AttributeMatch implements TargetStrategyInterface
     public function resolve(Rule $rule, array $sourceIds, CandidateIndex $index, int $maxLinks): array
     {
         $percent = (int) $rule->getData('price_band_percent');
+        $needed = $this->picker->needed($rule, $maxLinks);
         $result = [];
 
         foreach ($sourceIds as $sourceId) {
             $sourceId = (int) $sourceId;
 
             // Each dimension returns null for "no opinion" and an array for
-            // "narrowed to these". Intersecting only the non-null ones is what
-            // keeps an unconfigured dimension from silently emptying the set.
-            $sets = array_filter(
-                [
-                    $index->candidatesBySignature($sourceId),
-                    $index->candidatesByCategory($sourceId),
-                    $percent > 0 ? $index->candidatesByPriceBand($sourceId, $percent) : null,
-                ],
-                static fn (?array $set): bool => $set !== null
-            );
+            // "narrowed to these". Only the non-null ones constrain, which is
+            // what keeps an unconfigured dimension from silently emptying the set.
+            $bySignature = $index->candidatesBySignature($sourceId);
+            $byCategory = $index->candidatesByCategory($sourceId);
+            $byPrice = $percent > 0 ? $index->candidatesByPriceBand($sourceId, $percent) : null;
 
-            if ($sets === []) {
-                $candidates = $index->getAllIds();
-            } else {
-                $candidates = array_shift($sets);
-                foreach ($sets as $set) {
-                    // Hash lookups against a flipped set, not array_intersect:
-                    // that function casts every element to string to compare,
-                    // and this is the innermost loop of the whole run - once per
-                    // source product, over sets that can hold thousands of ids.
-                    $lookup = array_flip($set);
-                    $candidates = array_values(array_filter(
-                        $candidates,
-                        static fn (int $id): bool => isset($lookup[$id])
-                    ));
-                    if (!$candidates) {
-                        break;
+            // The list walked is one that is ALREADY in rank order - the
+            // signature bucket, the category bucket, or the whole ranked pool -
+            // so the walk can stop as soon as it has enough. The price band is
+            // in price order, so it is only ever a filter, unless it is the one
+            // constraint there is.
+            $walk = $bySignature ?? $byCategory;
+            $filters = [];
+            if ($bySignature !== null && $byCategory !== null) {
+                $filters[] = $byCategory;
+            }
+            if ($byPrice !== null) {
+                if ($walk === null) {
+                    $walk = $index->sortByRank($byPrice);
+                } else {
+                    $filters[] = $byPrice;
+                }
+            }
+            $walk ??= $index->getAllIds();
+
+            // Hash lookups against flipped sets, not array_intersect: that
+            // casts every element to string, and this is the innermost loop of
+            // the run.
+            $lookups = array_map('array_flip', $filters);
+
+            $candidates = [];
+            foreach ($walk as $candidateId) {
+                if ($candidateId === $sourceId) {
+                    continue;
+                }
+                foreach ($lookups as $lookup) {
+                    if (!isset($lookup[$candidateId])) {
+                        continue 2;
                     }
+                }
+                $candidates[] = $candidateId;
+                if (count($candidates) >= $needed) {
+                    break;
                 }
             }
 
-            // A plain filter, not array_diff: removing one known id does not
-            // justify a full diff (and its string casts).
-            $candidates = array_values(array_filter(
-                $candidates,
-                static fn (int $id): bool => $id !== $sourceId
-            ));
-            if (!$candidates) {
-                continue;
+            if ($candidates) {
+                $result[$sourceId] = $this->picker->pick($rule, $sourceId, $candidates, $maxLinks);
             }
-
-            $result[$sourceId] = array_slice($index->sortByRank($candidates), 0, $maxLinks);
         }
 
         return $result;
