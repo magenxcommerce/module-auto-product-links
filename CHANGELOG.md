@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/magenxcommerce/module-auto-product-links/compare/v1.0.3...v1.1.0) (2026-10-06)
+
+
+### Features
+
+* raise default links per product from 8 to 12 ([80dcb98](https://github.com/magenxcommerce/module-auto-product-links/commit/80dcb981e0cb4980c6797246a5d5860b5ec406c4))
+
+
+### Bug Fixes
+
+* Add Random product selection strategy for auto-generated links ([#12](https://github.com/magenxcommerce/module-auto-product-links/issues/12)) ([53cc372](https://github.com/magenxcommerce/module-auto-product-links/commit/53cc37256266dd4d178c002ab20d69ace936ce6c))
+* Increase default auto product links per rule from 8 to 12 ([#14](https://github.com/magenxcommerce/module-auto-product-links/issues/14)) ([80dcb98](https://github.com/magenxcommerce/module-auto-product-links/commit/80dcb981e0cb4980c6797246a5d5860b5ec406c4))
+
 ## [1.0.3](https://github.com/magenxcommerce/module-auto-product-links/compare/v1.0.2...v1.0.3) (2026-10-06)
 
 
