@@ -44,7 +44,24 @@ class Picker
      */
     public function pick(Rule $rule, int $sourceId, array $ranked, int $maxLinks): array
     {
-        $top = array_slice($ranked, 0, $this->needed($rule, $maxLinks));
+        return $this->sample($rule, $sourceId, array_slice($ranked, 0, $this->needed($rule, $maxLinks)), $maxLinks);
+    }
+
+    /**
+     * A stable random $maxLinks out of ALL of $candidates, kept in their given order.
+     *
+     * The same hash as pick(), without the "best N" cut-off. Costs one crc32 per
+     * candidate, so it is meant for a bucket-sized list, not a whole catalog.
+     *
+     * @param Rule $rule
+     * @param int $sourceId
+     * @param int[] $candidates
+     * @param int $maxLinks
+     * @return int[]
+     */
+    public function sample(Rule $rule, int $sourceId, array $candidates, int $maxLinks): array
+    {
+        $top = array_values($candidates);
         if (count($top) <= $maxLinks) {
             return $top;
         }

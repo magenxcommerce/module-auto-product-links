@@ -36,7 +36,7 @@
         <column xsi:type="varchar" name="link_type" length="16" nullable="false" default="related"
                 comment="related | upsell | crosssell | bought_together"/>
         <column xsi:type="varchar" name="target_strategy" length="32" nullable="false" default="attribute_match"
-                comment="attribute_match | co_purchase"/>
+                comment="attribute_match | co_purchase | random"/>
         <column xsi:type="mediumtext" name="conditions_serialized" nullable="true"
                 comment="SOURCE condition tree (JSON). Column name fixed by Magento\Rule\Model\AbstractModel."/>
         <column xsi:type="mediumtext" name="actions_serialized" nullable="true"

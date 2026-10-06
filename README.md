@@ -36,9 +36,10 @@ or add rules of your own beside them (see *Priorities* below).
 both *Men* and *Men > Shirts* is matched against *Shirts* only, so socks and coats from
 *Men* do not compete for its slots.
 
-The random cross-sell pick is stable: it is a hash of rule, product and candidate, so a
-product keeps the same cross-sells from night to night until the candidates change, and
-nothing is rewritten (or purged from cache) just because a run happened.
+The default cross-sell rule chooses by *Random products*. The pick is stable: it is a hash
+of rule, product and candidate, so a product keeps the same cross-sells from night to night
+until the candidates change, and nothing is rewritten (or purged from cache) just because a
+run happened.
 
 ## The guarantee
 
@@ -61,13 +62,18 @@ someone else's link. That is the standing audit trail for this promise.
 | **Fills** | Related / Up-Sells / Cross-Sells / Frequently Bought Together |
 | **Apply this rule to these products** | The *source* condition tree — which products get links |
 | **Link to these products** | The *target* condition tree — the candidate pool |
-| **Choose products by** | `Similar products` or `Bought together` |
+| **Choose products by** | `Similar products`, `Bought together` or `Random products` |
 | **Must match the source product on** | Attributes a candidate must share with the source (colour, size, manufacturer…), plus *shares a category* and *price band* |
 | **Price band (%)** | Half-width of the band, e.g. 20 = within ±20% of the source's price |
 | **Maximum links per product** | Cap on auto links (manual links are extra) |
 | **Show best** | How the survivors are ranked before the cap |
 | **Randomly pick from the best** | Optional N: link a stable random `max links` out of the best N instead of simply the best |
 | **Priority** | Lower runs first; see below |
+
+*Random products* links each product to a different random handful of the target pool —
+what cart cross-sells usually are. Match attributes and the price band still narrow the
+draw (e.g. random products from the same category), *randomly pick from the best* N limits
+it to the best N under *Show best*, and *Show best* decides the stored order of the picks.
 
 Both condition trees are the stock Magento rule widget — the same attribute picker as a
 Catalog Price Rule, with any/all and is / is-not / greater-than.
@@ -96,8 +102,9 @@ rule's link type, not the rule alone.
   show best sellers first.
 - **Up-Sells** — Choose by *Similar products*, match on *shares a category* + *price band*,
   price band `60`, target tree `price greater than {…}`, show most expensive first.
-- **Cross-Sells** — Choose by *Similar products*, no match attributes, target tree
-  narrowed to an Accessories category, show cheapest first, randomly pick from the best `30`.
+- **Cross-Sells** — Choose by *Random products*, no match attributes, target tree
+  narrowed to an Accessories category, show cheapest first. Add *randomly pick from the
+  best* `30` to draw only from the 30 cheapest accessories.
 - **Frequently Bought Together** — Choose by *Bought together*, show strongest match first.
 
 ## Configuration

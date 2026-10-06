@@ -15,6 +15,7 @@
             <argument name="strategies" xsi:type="array">
                 <item name="attribute_match" xsi:type="object">Magenx\AutoProductLinks\Model\Strategy\AttributeMatch</item>
                 <item name="co_purchase" xsi:type="object">Magenx\AutoProductLinks\Model\Strategy\CoPurchase</item>
+                <item name="random" xsi:type="object">Magenx\AutoProductLinks\Model\Strategy\Random</item>
             </argument>
         </arguments>
     </type>
