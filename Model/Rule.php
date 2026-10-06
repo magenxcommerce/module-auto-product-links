@@ -134,6 +134,44 @@ class Rule extends \Magento\Rule\Model\AbstractModel
     }
 
     /**
+     * loadPost() for the admin rule form's POST.
+     *
+     * Moves both condition trees to the top-level keys loadPost() reads first.
+     * This is the step whose absence made every rule run with EMPTY trees. The
+     * tree widgets post their fields under the condition classes' element name
+     * - `parameters[conditions][1--1][...]` and `parameters[actions][...]`,
+     * because the CatalogWidget condition classes set $elementName =
+     * 'parameters' - while loadPost() only looks for top-level `conditions` /
+     * `actions` keys. Core's own rule save controllers do the same unwrap (for
+     * `rule[...]`); without it loadPost() finds no tree, the save succeeds, and
+     * both trees are stored empty - "every product" on both sides.
+     *
+     * `rule` is accepted too, for a form built on the CatalogRule condition
+     * classes.
+     *
+     * @param array $data
+     * @return $this
+     */
+    public function loadAdminPost(array $data): self
+    {
+        foreach (['parameters', 'rule'] as $wrapper) {
+            if (!isset($data[$wrapper]) || !is_array($data[$wrapper])) {
+                continue;
+            }
+            foreach (['conditions', 'actions'] as $tree) {
+                if (isset($data[$wrapper][$tree]) && is_array($data[$wrapper][$tree])) {
+                    $data[$tree] = $data[$wrapper][$tree];
+                }
+            }
+            unset($data[$wrapper]);
+        }
+
+        $this->loadPost($data);
+
+        return $this;
+    }
+
+    /**
      * Attribute codes a candidate must share with the source product, plus the
      * pseudo codes __category and __price_band. Stored as JSON because the admin
      * field is a multiselect.

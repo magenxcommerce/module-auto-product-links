@@ -63,7 +63,7 @@ abstract class Rule extends Action
         // tree they just built.
         $data = $this->_getSession()->getData('magenx_auto_link_rule_data', true);
         if (!empty($data) && is_array($data)) {
-            $rule->loadPost(Rule\Save::unwrapConditionTrees($data));
+            $rule->loadAdminPost($data);
         }
 
         $this->coreRegistry->register(self::REGISTRY_KEY, $rule);
