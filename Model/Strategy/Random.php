@@ -216,7 +216,7 @@ class Random implements TargetStrategyInterface
      */
     private function hash(string $value): int
     {
-        return unpack('N', md5($value, true))[1];
+        return (int) hexdec(hash('xxh32', $value));
     }
 
     /**
