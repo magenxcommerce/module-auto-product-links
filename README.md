@@ -116,7 +116,7 @@ rule's link type, not the rule alone.
 | `general/enabled` | `1` | Both crons return immediately when off |
 | `general/dry_run` | `0` | Compute and log, write nothing |
 | `general/invalidate_cache` | `1` | Broadcast `cat_p_<id>` after a run |
-| `general/max_links_default` | `8` | |
+| `general/max_links_default` | `12` | Matches the storefront PDP rails: 12 per rail, 4 visible at a time |
 | `general/auto_position_base` | `1000` | Auto links start here so manual links sort first |
 | `limits/target_pool_cap` | `200000` | Memory guard. A rule whose target tree (empty = whole catalog) matches more is skipped and keeps its links |
 | `limits/batch_size` | `100` | Source products per transaction |

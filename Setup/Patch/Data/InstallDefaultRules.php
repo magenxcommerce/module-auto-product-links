@@ -99,7 +99,7 @@ class InstallDefaultRules implements DataPatchInterface
                 'is_active' => 1,
                 'store_id' => 0,
                 'sort_order' => self::DEFAULT_PRIORITY,
-                'max_links' => 8,
+                'max_links' => 12,
             ]);
         }
 
