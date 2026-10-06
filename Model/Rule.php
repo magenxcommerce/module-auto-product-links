@@ -44,6 +44,14 @@ class Rule extends \Magento\Rule\Model\AbstractModel
     public const LINK_TYPE_RELATED = 'related';
     public const LINK_TYPE_UPSELL = 'upsell';
     public const LINK_TYPE_CROSSSELL = 'crosssell';
+    /**
+     * Frequently Bought Together. Not one of Magento's stock link types: it is a
+     * link type of this module's own (see Setup/Patch/Data/AddBoughtTogetherLinkType),
+     * kept apart from cross-sells because the two answer different questions -
+     * cross-sells are a merchandising choice shown in the cart, this one is what
+     * customers actually bought together, read from order history.
+     */
+    public const LINK_TYPE_BOUGHT_TOGETHER = 'bought_together';
 
     public const STRATEGY_ATTRIBUTE_MATCH = 'attribute_match';
     public const STRATEGY_CO_PURCHASE = 'co_purchase';

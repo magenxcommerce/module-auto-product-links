@@ -27,7 +27,6 @@ class Config
     private const XML_PATH_MAX_LINKS_DEFAULT = 'magenx_auto_product_links/general/max_links_default';
     private const XML_PATH_AUTO_POSITION_BASE = 'magenx_auto_product_links/general/auto_position_base';
 
-    private const XML_PATH_MAX_SOURCE_PER_RUN = 'magenx_auto_product_links/limits/max_source_products_per_run';
     private const XML_PATH_TARGET_POOL_CAP = 'magenx_auto_product_links/limits/target_pool_cap';
     private const XML_PATH_BATCH_SIZE = 'magenx_auto_product_links/limits/batch_size';
 
@@ -39,11 +38,10 @@ class Config
     /** Fallbacks used when the stored value is missing, blank or zero. */
     private const DEFAULT_MAX_LINKS = 8;
     private const DEFAULT_POSITION_BASE = 1000;
-    private const DEFAULT_MAX_SOURCE_PER_RUN = 5000;
-    private const DEFAULT_TARGET_POOL_CAP = 5000;
+    private const DEFAULT_TARGET_POOL_CAP = 200000;
     private const DEFAULT_BATCH_SIZE = 100;
     private const DEFAULT_LOOKBACK_MONTHS = 6;
-    private const DEFAULT_MIN_SUPPORT = 3;
+    private const DEFAULT_MIN_SUPPORT = 2;
     private const DEFAULT_MAX_ORDERS_PER_RUN = 100000;
     private const DEFAULT_MAX_ITEMS_PER_ORDER = 50;
 
@@ -118,17 +116,6 @@ class Config
         // 0 is a legitimate choice here (a store with no manual links at all),
         // so only a negative value falls back.
         return $value >= 0 ? $value : self::DEFAULT_POSITION_BASE;
-    }
-
-    /**
-     * Source products processed per rule per run, before the cursor pauses.
-     *
-     * @param int|null $storeId
-     * @return int
-     */
-    public function getMaxSourceProductsPerRun(?int $storeId = null): int
-    {
-        return $this->positiveInt(self::XML_PATH_MAX_SOURCE_PER_RUN, self::DEFAULT_MAX_SOURCE_PER_RUN, $storeId);
     }
 
     /**

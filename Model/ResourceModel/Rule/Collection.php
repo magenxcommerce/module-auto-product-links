@@ -31,8 +31,9 @@ class Collection extends \Magento\Rule\Model\ResourceModel\Rule\Collection\Abstr
      * storefront cache every night.
      *
      * Note there is deliberately no active filter to pair with this. RuleRunner
-     * has to see inactive and expired rules so it can RELEASE the links they own
-     * - filtering them out would strand those links in the catalog forever. Date
+     * has to see a link type even when every rule of it is inactive or expired,
+     * because its end-of-run clean-up is what RELEASES the links those rules
+     * own - filtering them out would strand those links in the catalog. Date
      * eligibility is likewise decided per rule in Rule::isRunnableNow(), which
      * compares in the store timezone and so cannot be pushed into SQL.
      *

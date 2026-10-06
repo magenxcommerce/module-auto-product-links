@@ -53,9 +53,10 @@ class Ranker
      * @param int[] $candidateIds
      * @param int $storeId
      * @param array<int, float> $prices already loaded by the index builder
+     * @param int $seed varies the random order per rule
      * @return int[] best first
      */
-    public function rank(string $sort, array $candidateIds, int $storeId, array $prices = []): array
+    public function rank(string $sort, array $candidateIds, int $storeId, array $prices = [], int $seed = 0): array
     {
         if (!$candidateIds) {
             return [];
@@ -65,7 +66,7 @@ class Ranker
             self::SORT_NEWEST => $this->byCreatedAt($candidateIds),
             self::SORT_PRICE_ASC => $this->byPrice($candidateIds, $prices, true),
             self::SORT_PRICE_DESC => $this->byPrice($candidateIds, $prices, false),
-            self::SORT_RANDOM => $this->shuffled($candidateIds),
+            self::SORT_RANDOM => $this->shuffled($candidateIds, $seed),
             self::SORT_STRATEGY => $candidateIds,
             default => $this->byBestSellers($candidateIds, $storeId),
         };
@@ -93,13 +94,16 @@ class Ranker
                 return $candidateIds;
             }
 
-            $quantities = $connection->fetchPairs(
-                $connection->select()
-                    ->from($table, ['product_id', 'qty' => new \Zend_Db_Expr('SUM(qty_ordered)')])
-                    ->where('store_id = ?', $storeId)
-                    ->where('product_id IN (?)', $candidateIds)
-                    ->group('product_id')
-            );
+            $select = $connection->select()
+                ->from($table, ['product_id', 'qty' => new \Zend_Db_Expr('SUM(qty_ordered)')])
+                ->where('product_id IN (?)', $candidateIds)
+                ->group('product_id');
+            // A rule evaluated in the default scope (0) ranks on every store's
+            // sales; filtering on store 0 literally would rank on nothing.
+            if ($storeId > 0) {
+                $select->where('store_id = ?', $storeId);
+            }
+            $quantities = $connection->fetchPairs($select);
         } catch (\Exception $e) {
             return $candidateIds;
         }
@@ -162,14 +166,22 @@ class Ranker
     }
 
     /**
+     * A random order that is the SAME on every run.
+     *
+     * shuffle() would reorder the pool every night, so every product's links
+     * would be rewritten and its cache purged nightly with nothing really
+     * changed. Hashing the id with a per-rule seed looks just as random to a
+     * shopper and only moves when the pool itself changes.
+     *
      * @param int[] $candidateIds
+     * @param int $seed
      * @return int[]
      */
-    private function shuffled(array $candidateIds): array
+    private function shuffled(array $candidateIds, int $seed): array
     {
-        shuffle($candidateIds);
-
-        return $candidateIds;
+        return $this->stableSortDesc($candidateIds, static function (int $id) use ($seed): float {
+            return (float) crc32($seed . ':' . $id);
+        });
     }
 
     /**

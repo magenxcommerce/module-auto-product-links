@@ -27,10 +27,10 @@ class CandidateIndex
     /**
      * @param int[] $allIds every candidate, in rank order
      * @param array<int, int> $rank candidateId => rank (0 = best)
-     * @param array<string, int[]> $bySignature signature => candidateId[]
+     * @param array<string, int[]> $bySignature signature => candidateId[], each in rank order
      * @param array<int, string> $signatureOf productId => signature (sources included)
-     * @param array<int, int[]> $byCategory categoryId => candidateId[]
-     * @param array<int, int[]> $categoriesOf productId => categoryId[] (sources included)
+     * @param array<int, int[]> $byCategory categoryId => candidateId[], each in rank order
+     * @param array<int, int[]> $categoriesOf productId => its most specific categoryId[] (sources included)
      * @param array<int, float> $price productId => price (sources included)
      * @param array<int, int> $pricedIds ascending-by-price list of candidate ids
      * @param float[] $sortedPrices the prices of $pricedIds, same order (for bsearch)
@@ -61,7 +61,7 @@ class CandidateIndex
     }
 
     /**
-     * Candidates sharing the source's match-attribute signature.
+     * Candidates sharing the source's match-attribute signature, in rank order.
      *
      * Returns null when no attribute constraint is configured, meaning "no
      * narrowing from this dimension" - which is different from an empty array,
@@ -93,7 +93,8 @@ class CandidateIndex
     }
 
     /**
-     * Candidates sharing at least one navigable category with the source.
+     * Candidates in at least one of the source's most specific categories, in
+     * rank order.
      *
      * @param int $sourceId
      * @return int[]|null null when no category constraint is configured
@@ -112,6 +113,12 @@ class CandidateIndex
             return [];
         }
 
+        // The common case - one specific category - is a bucket that is already
+        // in rank order and needs no copy and no sort.
+        if (count($categoryIds) === 1) {
+            return $this->byCategory[reset($categoryIds)] ?? [];
+        }
+
         $union = [];
         foreach ($categoryIds as $categoryId) {
             foreach ($this->byCategory[$categoryId] ?? [] as $candidateId) {
@@ -119,11 +126,12 @@ class CandidateIndex
             }
         }
 
-        return array_keys($union);
+        return $this->sortByRank(array_keys($union));
     }
 
     /**
-     * Candidates whose price is within +/- $percent of the source's.
+     * Candidates whose price is within +/- $percent of the source's, in PRICE
+     * order (not rank order).
      *
      * Binary search over the price-sorted list, so this is O(log n + matches)
      * rather than a scan of the pool.

@@ -28,6 +28,10 @@
             <!-- The Yes/No and Enable/Disable source models used by
                  etc/adminhtml/system.xml and the rule listing. -->
             <module name="Magento_Config"/>
+            <!-- etc/schema.graphqls extends ProductInterface, and the Frequently
+                 Bought Together resolver extends this module's batch resolver. -->
+            <module name="Magento_CatalogGraphQl"/>
+            <module name="Magento_RelatedProductGraphQl"/>
             <!-- NOT sequenced, and not required: Magento_Reports owns
                  sales_bestsellers_aggregated_monthly, which Model/Ranker reads
                  for the bestsellers ranking behind an isTableExists() guard and

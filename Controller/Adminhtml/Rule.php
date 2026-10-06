@@ -62,8 +62,8 @@ abstract class Rule extends Action
         // Restore a failed submission so the merchant does not lose a condition
         // tree they just built.
         $data = $this->_getSession()->getData('magenx_auto_link_rule_data', true);
-        if (!empty($data)) {
-            $rule->addData($data);
+        if (!empty($data) && is_array($data)) {
+            $rule->loadPost(Rule\Save::unwrapConditionTrees($data));
         }
 
         $this->coreRegistry->register(self::REGISTRY_KEY, $rule);

@@ -32,6 +32,9 @@ class Save extends Rule implements \Magento\Framework\App\Action\HttpPostActionI
     /** Sanity ceiling on the price band half-width. */
     private const MAX_PRICE_BAND_PERCENT = 1000;
 
+    /** Ceiling on "pick from the best N": each source walks this many candidates. */
+    private const MAX_PICK_FROM_TOP = 1000;
+
     /**
      * @param Context $context
      * @param Registry $coreRegistry
@@ -73,10 +76,7 @@ class Save extends Rule implements \Magento\Framework\App\Action\HttpPostActionI
                 }
             }
 
-            // loadPost() is what maps BOTH condition trees out of the POST -
-            // core AbstractModel behaviour, so nothing here has to know how the
-            // tree is encoded.
-            $rule->loadPost($data);
+            $rule->loadPost(self::unwrapConditionTrees($data));
 
             $this->validate($rule);
             $rule->save();
@@ -100,6 +100,42 @@ class Save extends Rule implements \Magento\Framework\App\Action\HttpPostActionI
         $this->_getSession()->setData('magenx_auto_link_rule_data', $data);
 
         return $redirect->setPath('*/*/edit', ['rule_id' => (int) ($data['rule_id'] ?? 0)]);
+    }
+
+    /**
+     * Move both condition trees to the top-level keys loadPost() reads.
+     *
+     * This is the step whose absence made every rule run with EMPTY trees. The
+     * tree widgets post their fields under the condition classes' element name
+     * - `parameters[conditions][1--1][...]` and `parameters[actions][...]`,
+     * because the CatalogWidget condition classes set $elementName =
+     * 'parameters' - while Magento\Rule\Model\AbstractModel::loadPost() only
+     * looks for top-level `conditions` / `actions` keys. Core's own rule save
+     * controllers do this same unwrap (for `rule[...]`); without it loadPost()
+     * finds no tree, the save succeeds, and both trees are stored empty -
+     * "every product" on both sides.
+     *
+     * `rule` is accepted too, for a form built on the CatalogRule condition
+     * classes.
+     *
+     * @param array $data
+     * @return array
+     */
+    public static function unwrapConditionTrees(array $data): array
+    {
+        foreach (['parameters', 'rule'] as $wrapper) {
+            if (!isset($data[$wrapper]) || !is_array($data[$wrapper])) {
+                continue;
+            }
+            foreach (['conditions', 'actions'] as $tree) {
+                if (isset($data[$wrapper][$tree]) && is_array($data[$wrapper][$tree])) {
+                    $data[$tree] = $data[$wrapper][$tree];
+                }
+            }
+            unset($data[$wrapper]);
+        }
+
+        return $data;
     }
 
     /**
@@ -144,6 +180,28 @@ class Save extends Rule implements \Magento\Framework\App\Action\HttpPostActionI
             self::MAX_PRICE_BAND_PERCENT,
             __('Price Band (%)')
         );
+
+        $this->assertInRange(
+            $rule,
+            'pick_from_top',
+            0,
+            self::MAX_PICK_FROM_TOP,
+            __('Randomly Pick From the Best')
+        );
+        if ((string) $rule->getData('pick_from_top') === '') {
+            $rule->setData('pick_from_top', null);
+        }
+
+        // Frequently Bought Together means "bought together", so it only ever
+        // comes from order history. Letting it take "similar products" would
+        // just make it a second Related Products rail.
+        if ((string) $rule->getData('link_type') === \Magenx\AutoProductLinks\Model\Rule::LINK_TYPE_BOUGHT_TOGETHER
+            && (string) $rule->getData('target_strategy') !== \Magenx\AutoProductLinks\Model\Rule::STRATEGY_CO_PURCHASE
+        ) {
+            throw new LocalizedException(
+                __('Frequently Bought Together rules must choose products by "Bought together (from order history)".')
+            );
+        }
 
         $matchAttributes = $rule->getMatchAttributes();
 

@@ -1,0 +1,5 @@
+# Copyright © Magenx. All rights reserved.
+
+interface ProductInterface {
+    frequently_bought_together_products: [ProductInterface] @doc(description: "Products most often bought in the same order as this one, mined from order history by Magenx_AutoProductLinks. Separate from crosssell_products, which are the merchant's cart add-on suggestions.") @resolver(class: "Magenx\\AutoProductLinks\\Model\\Resolver\\Batch\\FrequentlyBoughtTogetherProducts")
+}

@@ -34,8 +34,9 @@ use Magento\Store\Model\System\Store as SystemStore;
  *
  * Both trees live on one page. They do not collide because
  * Magento\Rule\Model\AbstractModel::getActions() sets the prefix "actions" on
- * the second one, which is exactly what the two setJsFormObject calls below rely
- * on.
+ * the second one. Each tree is also told the id of its own fieldset through
+ * setJsFormObject(), which is what the SKU and category choosers in its rows
+ * write their picks back into.
  */
 class Form extends Generic
 {
@@ -150,7 +151,12 @@ class Form extends Generic
             'title' => __('Fills'),
             'required' => true,
             'values' => $this->linkTypeSource->toOptionArray(),
-            'note' => __('Which of the product page\'s three link sections this rule populates.'),
+            'note' => __(
+                'Which product rail this rule fills. Rules of the same type run in priority order and the '
+                . 'first one that finds links for a product owns it; the default rules (priority 1000) fill '
+                . 'whatever the others leave empty. Frequently Bought Together only takes rules that '
+                . 'choose products by order history.'
+            ),
         ]);
 
         $fieldset->addField('store_id', 'select', [
@@ -248,6 +254,18 @@ class Form extends Generic
             'values' => $this->resultSortSource->toOptionArray(),
             'note' => __('Which candidates win the limited number of slots, and in what order they are stored.'),
         ]);
+
+        $fieldset->addField('pick_from_top', 'text', [
+            'name' => 'pick_from_top',
+            'label' => __('Randomly Pick From the Best'),
+            'title' => __('Randomly Pick From the Best'),
+            'class' => 'validate-digits',
+            'note' => __(
+                'Optional. Instead of the best "Maximum Links" candidates, link a random selection out of the '
+                . 'best this many - e.g. Cheapest first + 50 gives every product a different handful of the 50 '
+                . 'cheapest products. The pick stays the same from run to run. Leave empty to link the best.'
+            ),
+        ]);
     }
 
     /**
@@ -292,6 +310,8 @@ class Form extends Generic
             'legend' => __('Apply This Rule To These Products'),
         ])->setRenderer($renderer);
 
+        $model->getConditions()->setJsFormObject('rule_conditions_fieldset');
+
         $fieldset->addField('conditions', 'text', [
             'name' => 'conditions',
             'label' => __('Apply This Rule To These Products'),
@@ -313,6 +333,8 @@ class Form extends Generic
         $fieldset = $form->addFieldset('actions_fieldset', [
             'legend' => __('Link To These Products'),
         ])->setRenderer($renderer);
+
+        $model->getActions()->setJsFormObject('rule_actions_fieldset');
 
         $fieldset->addField('actions', 'text', [
             'name' => 'actions',

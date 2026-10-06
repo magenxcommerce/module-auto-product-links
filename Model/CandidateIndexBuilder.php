@@ -16,8 +16,9 @@ use Magenx\AutoProductLinks\Model\SameAsSource\PriceMap;
  * Two phases, and the split is the point:
  *
  *   buildPool()   once per rule - everything that depends only on the candidate
- *                 pool: the attribute buckets, the inverted category map, the
- *                 price-sorted list, and the ranking.
+ *                 pool: the ranking, then the attribute buckets and the inverted
+ *                 category map (both filled in rank order), and the price-sorted
+ *                 list.
  *   withSources() once per batch - only the source-side rows, folded onto that
  *                 pool to produce the immutable CandidateIndex.
  *
@@ -69,27 +70,6 @@ class CandidateIndexBuilder
         $wantsPriceBand = in_array(Rule::MATCH_PRICE_BAND, $matchAttributes, true);
         $sort = (string) $rule->getData('result_sort');
 
-        // --- signatures ---------------------------------------------------
-        // One query per attribute for the whole pool, then a single string per
-        // product. Grouping the candidates by that string is what turns the
-        // per-source match into a hash lookup.
-        $signatureOf = $this->signatures($attributeCodes, $candidateIds, $storeId);
-        $bySignature = [];
-        foreach ($candidateIds as $candidateId) {
-            $signature = $signatureOf[$candidateId] ?? null;
-            if ($signature !== null) {
-                $bySignature[$signature][] = $candidateId;
-            }
-        }
-
-        // --- categories -----------------------------------------------------
-        $categoriesOf = [];
-        $byCategory = [];
-        if ($wantsCategory) {
-            $categoriesOf = $this->categoryMembership->load($candidateIds);
-            $byCategory = $this->categoryMembership->invert($categoriesOf);
-        }
-
         // --- prices ---------------------------------------------------------
         // Loaded whenever a band is wanted, and also whenever the ranking is
         // price-based, so the two never load it twice.
@@ -109,12 +89,43 @@ class CandidateIndexBuilder
         }
 
         // --- ranking ----------------------------------------------------
-        // The pool is ranked ONCE here; per source we only ever sort the small
-        // surviving set by the precomputed rank. Note that SORT_RANDOM therefore
-        // shuffles once per rule rather than once per batch - one consistent
-        // order across the whole run, which is the more defensible reading of
-        // "random" anyway.
-        $ranked = $this->ranker->rank($sort, $candidateIds, $storeId, $prices);
+        // Ranked FIRST, and every bucket below is filled by walking the ranked
+        // list, so each bucket comes out already in rank order. A strategy can
+        // then take the best N of a bucket by reading its head instead of
+        // sorting it - which is what keeps a whole-catalog rule (the default
+        // cross-sell rule has no constraint at all, so its "bucket" is the
+        // entire catalog) linear rather than sources x catalog.
+        $ranked = $this->ranker->rank($sort, $candidateIds, $storeId, $prices, (int) $rule->getId());
+
+        // --- signatures ---------------------------------------------------
+        // One query per attribute for the whole pool, then a single string per
+        // product. Grouping the candidates by that string is what turns the
+        // per-source match into a hash lookup.
+        $signatureOf = $this->signatures($attributeCodes, $candidateIds, $storeId);
+        $bySignature = [];
+        foreach ($ranked as $candidateId) {
+            $signature = $signatureOf[$candidateId] ?? null;
+            if ($signature !== null) {
+                $bySignature[$signature][] = $candidateId;
+            }
+        }
+
+        // --- categories -----------------------------------------------------
+        // Candidates are bucketed under EVERY category they are assigned to;
+        // sources look up only their most specific ones. See CategoryMembership.
+        $categoriesOf = [];
+        $byCategory = [];
+        if ($wantsCategory) {
+            $membership = $this->categoryMembership->load($candidateIds);
+            $categoriesOf = $membership['specific'];
+            $inRankOrder = [];
+            foreach ($ranked as $candidateId) {
+                if (isset($membership['all'][$candidateId])) {
+                    $inRankOrder[$candidateId] = $membership['all'][$candidateId];
+                }
+            }
+            $byCategory = $this->categoryMembership->invert($inRankOrder);
+        }
 
         return new PoolIndex(
             $candidateIds,
@@ -166,7 +177,7 @@ class CandidateIndexBuilder
                 $signatureOf += $this->signatures($pool->attributeCodes, $newIds, $storeId);
             }
             if ($pool->wantsCategory) {
-                $categoriesOf += $this->categoryMembership->load($newIds);
+                $categoriesOf += $this->categoryMembership->load($newIds)['specific'];
             }
             // Only the price BAND reads a source's own price. When prices were
             // loaded purely to rank the pool, pricedIds is empty, the band is

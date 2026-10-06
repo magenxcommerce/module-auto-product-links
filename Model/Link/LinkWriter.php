@@ -7,7 +7,6 @@ declare(strict_types=1);
 namespace Magenx\AutoProductLinks\Model\Link;
 
 use Magenx\AutoProductLinks\Model\ResourceModel\Ledger;
-use Magento\Catalog\Model\Product\Link;
 use Magento\Framework\App\ResourceConnection;
 
 /**
@@ -43,22 +42,17 @@ class LinkWriter
     private const LINK_TABLE = 'catalog_product_link';
     private const POSITION_TABLE = 'catalog_product_link_attribute_int';
 
-    /** Magento's stock link type ids, by our rule's link_type value. */
-    private const LINK_TYPE_IDS = [
-        \Magenx\AutoProductLinks\Model\Rule::LINK_TYPE_RELATED => Link::LINK_TYPE_RELATED,
-        \Magenx\AutoProductLinks\Model\Rule::LINK_TYPE_UPSELL => Link::LINK_TYPE_UPSELL,
-        \Magenx\AutoProductLinks\Model\Rule::LINK_TYPE_CROSSSELL => Link::LINK_TYPE_CROSSSELL,
-    ];
-
     /**
      * @param ResourceConnection $resource
      * @param Ledger $ledger
      * @param PositionAttribute $positionAttribute
+     * @param LinkTypeResolver $linkTypeResolver
      */
     public function __construct(
         private readonly ResourceConnection $resource,
         private readonly Ledger $ledger,
-        private readonly PositionAttribute $positionAttribute
+        private readonly PositionAttribute $positionAttribute,
+        private readonly LinkTypeResolver $linkTypeResolver
     ) {
     }
 
@@ -70,7 +64,7 @@ class LinkWriter
      */
     public function resolveLinkTypeId(string $linkType): ?int
     {
-        return self::LINK_TYPE_IDS[$linkType] ?? null;
+        return $this->linkTypeResolver->getLinkTypeId($linkType);
     }
 
     /**

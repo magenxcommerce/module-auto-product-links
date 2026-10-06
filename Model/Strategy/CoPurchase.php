@@ -17,13 +17,12 @@ use Magento\Store\Model\StoreManagerInterface;
 /**
  * Links to the products most often bought in the same order as the source.
  *
- * This is what gives the storefront's "Frequently Bought Together" rail real
- * data: that rail renders Magento's native cross-sells, which until now nothing
- * populated.
+ * This is what feeds the storefront's "Frequently Bought Together" rail: the
+ * module's own bought_together link type only accepts rules using this strategy.
  *
- * Note this is a target STRATEGY, not a hardcoded cross-sell behaviour. A rule
- * chooses it, and a rule chooses its own link type - so a merchant can just as
- * well drive Related Products from co-purchase history. The mined partners are
+ * It is still a target STRATEGY rather than hardcoded behaviour, so a merchant
+ * can just as well drive Related Products or Cross-Sells from co-purchase
+ * history. The mined partners are
  * still intersected with the rule's target conditions and its match attributes,
  * so "only ever suggest accessories, and only ones bought with this" is a single
  * rule rather than a special case in code.
@@ -34,11 +33,13 @@ class CoPurchase implements TargetStrategyInterface
      * @param CoPurchaseResource $coPurchase
      * @param Config $config
      * @param StoreManagerInterface $storeManager
+     * @param Picker $picker
      */
     public function __construct(
         private readonly CoPurchaseResource $coPurchase,
         private readonly Config $config,
-        private readonly StoreManagerInterface $storeManager
+        private readonly StoreManagerInterface $storeManager,
+        private readonly Picker $picker
     ) {
     }
 
@@ -132,7 +133,7 @@ class CoPurchase implements TargetStrategyInterface
                 $candidates = $index->sortByRank($candidates);
             }
 
-            $result[$sourceId] = array_slice($candidates, 0, $maxLinks);
+            $result[$sourceId] = $this->picker->pick($rule, $sourceId, $candidates, $maxLinks);
         }
 
         return $result;

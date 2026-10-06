@@ -7,17 +7,21 @@ declare(strict_types=1);
 namespace Magenx\AutoProductLinks\Model;
 
 use Magenx\AutoProductLinks\Model\ResourceModel\CoPurchase as CoPurchaseResource;
+use Magento\Framework\FlagManager;
 use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Psr\Log\LoggerInterface;
 
 /**
  * Rebuilds the co-purchase aggregate.
  *
- * Only the current month is rebuilt on a normal night, plus the previous month
- * during the first few days of a new one so late or imported orders are picked
- * up. Older months are immutable and left alone - which is what keeps a nightly
- * run proportional to a month of orders rather than to the whole look-back
- * window.
+ * The current month is rebuilt on every run, plus the previous month during the
+ * first few days of a new one so late or imported orders are picked up. Every
+ * other month inside the look-back window is mined once and then left alone -
+ * which is what keeps a nightly run proportional to a month of orders rather
+ * than to the whole window. Which months have been mined is remembered in the
+ * `flag` table, so the very first run (and a run after the window is widened)
+ * backfills the history that is already there instead of starting from an
+ * empty aggregate and taking months to warm up.
  *
  * Each period is cleared and rebuilt rather than accumulated. That is what makes
  * the job safe to re-run: a crash half way through leaves a partial month the
@@ -43,16 +47,21 @@ class CoPurchaseMiner
     /** Days into a new month during which the previous one is still rebuilt. */
     private const PREVIOUS_MONTH_GRACE_DAYS = 3;
 
+    /** Flag holding the list of months already mined. */
+    private const FLAG_MINED_PERIODS = 'magenx_auto_link_copurchase_mined_periods';
+
     /**
      * @param CoPurchaseResource $coPurchase
      * @param Config $config
      * @param TimezoneInterface $timezone
+     * @param FlagManager $flagManager
      * @param LoggerInterface $logger
      */
     public function __construct(
         private readonly CoPurchaseResource $coPurchase,
         private readonly Config $config,
         private readonly TimezoneInterface $timezone,
+        private readonly FlagManager $flagManager,
         private readonly LoggerInterface $logger
     ) {
     }
@@ -71,15 +80,28 @@ class CoPurchaseMiner
             return;
         }
 
+        $cutoff = $this->config->getCoPurchaseCutoffPeriod();
+        $mined = array_values(array_filter(
+            (array) ($this->flagManager->getFlagData(self::FLAG_MINED_PERIODS) ?: []),
+            static fn ($period): bool => is_string($period) && $period >= $cutoff
+        ));
+
+        $periods = $this->periodsToRebuild($cutoff, $mined);
         $rebuilt = 0;
-        foreach ($this->periodsToRebuild() as $period) {
+        foreach ($periods as $period) {
             $rebuilt += $this->rebuildPeriod($period);
+            // Saved after every month, so a run that dies half way through a
+            // backfill does not redo the months it already finished.
+            $mined[] = $period;
+            $mined = array_values(array_unique($mined));
+            $this->flagManager->saveFlag(self::FLAG_MINED_PERIODS, $mined);
         }
 
-        $pruned = $this->coPurchase->prune($this->config->getCoPurchaseCutoffPeriod());
+        $pruned = $this->coPurchase->prune($cutoff);
 
         $this->logger->info(sprintf(
-            'Magenx_AutoProductLinks: co-purchase mining done, %d pair rows written, %d aged rows pruned.',
+            'Magenx_AutoProductLinks: co-purchase mining done for %s, %d pair rows written, %d aged rows pruned.',
+            implode(', ', $periods),
             $rebuilt,
             $pruned
         ));
@@ -154,20 +176,36 @@ class CoPurchaseMiner
     }
 
     /**
-     * The periods a run should rebuild: this month, and briefly last month too.
+     * The periods a run should rebuild: this month, briefly last month too, and
+     * every month inside the window that has never been mined.
      *
-     * @return string[]
+     * @param string $cutoff first month of the window, Y-m-01
+     * @param string[] $mined months already mined
+     * @return string[] oldest first
      */
-    private function periodsToRebuild(): array
+    private function periodsToRebuild(string $cutoff, array $mined): array
     {
         $today = $this->timezone->date();
-        $periods = [$today->format('Y-m-01')];
+        $current = $today->format('Y-m-01');
+        $periods = [$current => true];
 
         if ((int) $today->format('j') <= self::PREVIOUS_MONTH_GRACE_DAYS) {
-            $periods[] = $this->timezone->date()
-                ->modify('first day of last month')
-                ->format('Y-m-01');
+            $periods[$this->timezone->date()->modify('first day of last month')->format('Y-m-01')] = true;
         }
+
+        // Plain month arithmetic on bare Y-m-01 days, for the reason given in
+        // rebuildPeriod().
+        $minedLookup = array_flip($mined);
+        $month = new \DateTimeImmutable($cutoff);
+        while (($period = $month->format('Y-m-01')) < $current) {
+            if (!isset($minedLookup[$period])) {
+                $periods[$period] = true;
+            }
+            $month = $month->modify('first day of next month');
+        }
+
+        $periods = array_keys($periods);
+        sort($periods);
 
         return $periods;
     }

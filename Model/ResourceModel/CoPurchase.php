@@ -124,7 +124,7 @@ class CoPurchase
         $sql = sprintf(
             'INSERT INTO %1$s'
             . ' (store_id, period, product_id, linked_product_id, orders_count, updated_at)'
-            . ' SELECT a.store_id, ?, a.product_id, b.product_id, COUNT(DISTINCT a.order_id), NOW()'
+            . ' SELECT COALESCE(a.store_id, 0), ?, a.product_id, b.product_id, COUNT(DISTINCT a.order_id), NOW()'
             . ' FROM %2$s AS o'
             . ' INNER JOIN %3$s AS a ON a.order_id = o.entity_id'
             . ' INNER JOIN %3$s AS b ON b.order_id = o.entity_id'
@@ -137,9 +137,13 @@ class CoPurchase
             . ' AND COALESCE(o.total_item_count, 0) <= ?'
             . ' AND a.parent_item_id IS NULL AND a.product_type <> ?'
             . ' AND b.parent_item_id IS NULL AND b.product_type <> ?'
+            // Also drops lines whose product was deleted: product_id is NULL
+            // there, and NULL <> x is never true.
             . ' AND b.product_id <> a.product_id'
-            . ' AND b.store_id = a.store_id'
-            . ' GROUP BY a.store_id, a.product_id, b.product_id'
+            // Lines in one order share its store. store_id itself is nullable
+            // (the store was deleted), hence the COALESCE in the SELECT: a NULL
+            // would fail the insert into the NOT NULL column.
+            . ' GROUP BY COALESCE(a.store_id, 0), a.product_id, b.product_id'
             . ' ON DUPLICATE KEY UPDATE'
             . ' orders_count = orders_count + VALUES(orders_count), updated_at = VALUES(updated_at)',
             $table,
