@@ -55,6 +55,7 @@ class Rule extends \Magento\Rule\Model\AbstractModel
 
     public const STRATEGY_ATTRIBUTE_MATCH = 'attribute_match';
     public const STRATEGY_CO_PURCHASE = 'co_purchase';
+    public const STRATEGY_RANDOM = 'random';
 
     /** Pseudo attribute codes understood by the "must match the source" list. */
     public const MATCH_CATEGORY = '__category';

@@ -74,7 +74,7 @@ class InstallDefaultRules implements DataPatchInterface
                 'description' => 'Fills the cart cross-sells with a random pick from the 50 cheapest '
                     . 'products in the catalog. The pick is stable per product, so it does not churn nightly.',
                 'link_type' => Rule::LINK_TYPE_CROSSSELL,
-                'target_strategy' => Rule::STRATEGY_ATTRIBUTE_MATCH,
+                'target_strategy' => Rule::STRATEGY_RANDOM,
                 'match_attributes' => null,
                 'result_sort' => Ranker::SORT_PRICE_ASC,
                 'pick_from_top' => 50,

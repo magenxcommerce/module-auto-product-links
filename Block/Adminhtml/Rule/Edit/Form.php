@@ -215,9 +215,10 @@ class Form extends Generic
             'required' => true,
             'values' => $this->targetStrategySource->toOptionArray(),
             'note' => __(
-                'Either products that resemble the one being viewed, or products that customers '
-                . 'actually bought alongside it. Both are still limited to the candidate products '
-                . 'you define further down.'
+                'Products that resemble the one being viewed, products that customers actually bought '
+                . 'alongside it, or a random pick (the usual choice for cart cross-sells) that differs per '
+                . 'product but stays the same from run to run. All are limited to the candidate products '
+                . 'you define further down, and to the matching rules below.'
             ),
         ]);
 

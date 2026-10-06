@@ -40,6 +40,7 @@
 "Show Best","Show Best"
 "Similar products (match attributes, category or price)","Similar products (match attributes, category or price)"
 "Bought together (from order history)","Bought together (from order history)"
+"Random products (a stable random pick per product)","Random products (a stable random pick per product)"
 "Best sellers first","Best sellers first"
 "Strongest match first (bought-together strength)","Strongest match first (bought-together strength)"
 "Newest first","Newest first"
