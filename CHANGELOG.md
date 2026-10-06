@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/magenxcommerce/module-auto-product-links/compare/v1.0.1...v1.0.2) (2026-10-06)
+
+
+### Bug Fixes
+
+* Refactor rule execution to process by link type with single ownership ([#8](https://github.com/magenxcommerce/module-auto-product-links/issues/8)) ([b7eb77b](https://github.com/magenxcommerce/module-auto-product-links/commit/b7eb77bf3e6c2a8caa818a910e14702d36514bf9))
+
 ## [1.0.1](https://github.com/magenxcommerce/module-auto-product-links/compare/v1.0.0...v1.0.1) (2026-08-12)
 
 
