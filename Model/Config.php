@@ -36,7 +36,7 @@ class Config
     private const XML_PATH_MAX_ITEMS_PER_ORDER = 'magenx_auto_product_links/copurchase/max_items_per_order';
 
     /** Fallbacks used when the stored value is missing, blank or zero. */
-    private const DEFAULT_MAX_LINKS = 8;
+    private const DEFAULT_MAX_LINKS = 12;
     private const DEFAULT_POSITION_BASE = 1000;
     private const DEFAULT_TARGET_POOL_CAP = 200000;
     private const DEFAULT_BATCH_SIZE = 100;

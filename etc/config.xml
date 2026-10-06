@@ -16,7 +16,7 @@
                 <enabled>1</enabled>
                 <dry_run>0</dry_run>
                 <invalidate_cache>1</invalidate_cache>
-                <max_links_default>8</max_links_default>
+                <max_links_default>12</max_links_default>
                 <!-- Auto links start at 1000 so merchant-picked links (1..N) always
                      sort first, deterministically and without reading MAX(position). -->
                 <auto_position_base>1000</auto_position_base>

@@ -45,7 +45,7 @@
                 comment="JSON list of attribute codes a candidate must SHARE with the source, plus the pseudo-codes __category and __price_band"/>
         <column xsi:type="smallint" name="price_band_percent" unsigned="true" nullable="true"
                 comment="Half-width of the price band in percent, used only when __price_band is selected"/>
-        <column xsi:type="smallint" name="max_links" unsigned="true" nullable="false" default="8"
+        <column xsi:type="smallint" name="max_links" unsigned="true" nullable="false" default="12"
                 comment="Maximum auto links written per source product for this link type"/>
         <column xsi:type="varchar" name="result_sort" length="32" nullable="false" default="bestsellers"
                 comment="How the surviving candidates are ranked before truncation"/>
