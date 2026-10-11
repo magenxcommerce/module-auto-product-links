@@ -9,6 +9,7 @@ namespace Magenx\AutoProductLinks\Model\Link;
 use Magenx\AutoProductLinks\Model\Rule;
 use Magento\Catalog\Model\Product\Link;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\ObjectManager\ResetAfterRequestInterface;
 
 /**
  * Maps a rule's link_type value to Magento's numeric link_type_id.
@@ -16,9 +17,9 @@ use Magento\Framework\App\ResourceConnection;
  * The three stock types have fixed ids. Frequently Bought Together is a link
  * type this module registers itself (Setup/Patch/Data/AddBoughtTogetherLinkType),
  * so its id is whatever catalog_product_link_type's auto-increment handed out
- * on that install and is looked up by code, once per process.
+ * on that install and is looked up by code, once per request.
  */
-class LinkTypeResolver
+class LinkTypeResolver implements ResetAfterRequestInterface
 {
     /** catalog_product_link_type.code of the Frequently Bought Together link type. */
     public const BOUGHT_TOGETHER_CODE = 'magenx_bought_together';
@@ -38,6 +39,17 @@ class LinkTypeResolver
     public function __construct(
         private readonly ResourceConnection $resource
     ) {
+    }
+
+    /**
+     * Forget the looked-up id between requests in a long-running worker, so a
+     * "not installed" answer does not outlive setup:upgrade.
+     *
+     * @inheritDoc
+     */
+    public function _resetState(): void
+    {
+        $this->boughtTogetherId = null;
     }
 
     /**
