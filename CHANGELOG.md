@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/magenxcommerce/module-auto-product-links/compare/v1.1.0...v1.1.1) (2026-10-11)
+
+
+### Bug Fixes
+
+* reset the bought-together link type id after each request ([#15](https://github.com/magenxcommerce/module-auto-product-links/issues/15)) ([a9b5679](https://github.com/magenxcommerce/module-auto-product-links/commit/a9b5679bad4a7829d04112ddc1f4045e0dc1b23b))
+
 ## [1.1.0](https://github.com/magenxcommerce/module-auto-product-links/compare/v1.0.3...v1.1.0) (2026-10-06)
 
 
